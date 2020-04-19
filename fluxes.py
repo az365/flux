@@ -5,12 +5,12 @@ MAX_ITEMS_IN_MEMORY = 5000000
 
 
 try:  # Assume we're a sub-module in a package.
-    from .any_flux import AnyFlux
-    from .lines_flux import LinesFlux
-    from .rows_flux import RowsFlux
-    from .pairs_flux import PairsFlux
-    from .schema_flux import SchemaFlux
-    from .records_flux import RecordsFlux
+    from flux.any_flux import AnyFlux
+    from flux.lines_flux import LinesFlux
+    from flux.rows_flux import RowsFlux
+    from flux.pairs_flux import PairsFlux
+    from flux.schema_flux import SchemaFlux
+    from flux.records_flux import RecordsFlux
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from any_flux import AnyFlux
     from lines_flux import LinesFlux
