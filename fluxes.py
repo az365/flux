@@ -4,7 +4,6 @@ from enum import Enum
 MAX_ITEMS_IN_MEMORY = 5000000
 TMP_FILES_TEMPLATE = 'flux_{}.tmp'
 TMP_FILES_ENCODING = 'utf8'
-DEFAULT_FROM_META = -1
 
 
 try:  # Assume we're a sub-module in a package.
@@ -55,14 +54,6 @@ def is_flux(obj):
         obj,
         (AnyFlux, LinesFlux, RowsFlux, PairsFlux, SchemaFlux, RecordsFlux),
     )
-
-
-def update_arg(args, addition=None):
-    if addition:
-        args = list(args) + (addition if isinstance(addition, (list, tuple)) else [addition])
-    if len(args) == 1 and isinstance(args[0], (list, tuple)):
-        args = args[0]
-    return args
 
 
 def concat(*list_fluxes):

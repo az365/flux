@@ -2,8 +2,10 @@ import pandas as pd
 
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
+    from utils import arguments as arg
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
+    from ..utils import arguments as arg
 
 
 def is_record(item):
@@ -169,18 +171,18 @@ class RecordsFlux(fx.AnyFlux):
             self,
             *keys,
             reverse=False,
-            step=fx.DEFAULT_FROM_META,
+            step=arg.DEFAULT,
             verbose=True,
     ):
         key_function = get_key_function(keys)
-        step = self.max_items_in_memory if step == fx.DEFAULT_FROM_META else step
+        step = arg.undefault(step, self.max_items_in_memory)
         if self.is_in_memory() or (step is None) or (self.count is not None and self.count <= step):
             return self.memory_sort(key_function, reverse)
         else:
             return self.disk_sort(key_function, reverse, step=step, verbose=verbose)
 
     def sorted_group_by(self, *keys, as_pairs=True):
-        keys = fx.update_arg(keys)
+        keys = arg.update(keys)
 
         def get_groups():
             key_function = get_key_function(keys)
@@ -206,9 +208,9 @@ class RecordsFlux(fx.AnyFlux):
             )
         return fx_groups.to_memory() if self.is_in_memory() else fx_groups
 
-    def group_by(self, *keys, step=fx.DEFAULT_FROM_META, as_pairs=True, verbose=True):
-        keys = fx.update_arg(keys)
-        step = self.max_items_in_memory if step == fx.DEFAULT_FROM_META else step
+    def group_by(self, *keys, step=arg.DEFAULT, as_pairs=True, verbose=True):
+        keys = arg.update(keys)
+        step = arg.undefault(step, self.max_items_in_memory)
         if not as_pairs:
             keys = [
                 get_key_function(keys, take_hash=True),
@@ -240,7 +242,7 @@ class RecordsFlux(fx.AnyFlux):
 
     def to_rows(self, *columns, **kwargs):
         add_title_row = kwargs.pop('add_title_row', None)
-        columns = fx.update_arg(columns, kwargs.pop('columns', None))
+        columns = arg.update(columns, kwargs.pop('columns', None))
         if kwargs:
             raise AttributeError('to_rows(): {} arguments are not supported'.format(kwargs.keys()))
 

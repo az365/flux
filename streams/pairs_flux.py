@@ -1,9 +1,15 @@
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
-    from utils import readers
+    from utils import (
+        arguments as arg,
+        readers,
+    )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
-    from ..utils import readers
+    from ..utils import (
+        arguments as arg,
+        readers,
+    )
 
 
 def is_pair(row):
@@ -80,12 +86,8 @@ class PairsFlux(fx.RowsFlux):
             reverse=reverse
         )
 
-    def disk_sort_by_key(
-            self,
-            reverse=False,
-            step=fx.DEFAULT_FROM_META,
-    ):
-        step = self.max_items_in_memory if step == fx.DEFAULT_FROM_META else step
+    def disk_sort_by_key(self, reverse=False, step=arg.DEFAULT):
+        step = arg.undefault(step, self.max_items_in_memory)
         return self.disk_sort(
             key=get_key,
             reverse=reverse,
@@ -163,9 +165,9 @@ class PairsFlux(fx.RowsFlux):
             flux_for_items,
         )
 
-    def extract_keys_on_disk(self, file_template=None, encoding='default'):
-        encoding = self.tmp_files_encoding if encoding == 'default' else encoding
-        file_template = file_template or self.tmp_files_template
+    def extract_keys_on_disk(self, file_template=arg.DEFAULT, encoding=arg.DEFAULT):
+        encoding = arg.undefault(encoding, self.tmp_files_encoding)
+        file_template = arg.undefault(file_template, self.tmp_files_template)
         filename = file_template.format('json') if '{}' in file_template else file_template
         self.to_records().to_json().to_file(
             filename,

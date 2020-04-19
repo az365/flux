@@ -5,8 +5,10 @@ import json
 
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
+    from utils import arguments as arg
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
+    from ..utils import arguments as arg
 
 
 def merge_iter(iterables, key_function, reverse=False):
@@ -391,15 +393,15 @@ class AnyFlux:
 
     def split_to_disk_by_step(
             self,
-            step=fx.DEFAULT_FROM_META,
-            file_template=fx.DEFAULT_FROM_META, encoding=fx.DEFAULT_FROM_META,
+            step=arg.DEFAULT,
+            file_template=arg.DEFAULT, encoding=arg.DEFAULT,
             sort_each_by=None, reverse=False,
             verbose=True,
     ):
         count, total_fx = self.count, self
-        step = self.max_items_in_memory if step == fx.DEFAULT_FROM_META else step
-        file_template = self.tmp_files_template if file_template == fx.DEFAULT_FROM_META else file_template
-        encoding = self.tmp_files_encoding if encoding == fx.DEFAULT_FROM_META else encoding
+        step = arg.undefault(step, self.max_items_in_memory)
+        file_template = arg.undefault(file_template, self.tmp_files_template)
+        encoding = arg.undefault(encoding, self.tmp_files_encoding)
         if count is None:
             total_fn = file_template.format('total')
             if verbose:
@@ -454,8 +456,8 @@ class AnyFlux:
             **self.get_meta()
         )
 
-    def disk_sort(self, key=lambda i: i, reverse=False, step=fx.DEFAULT_FROM_META, verbose=False):
-        step = self.max_items_in_memory if step == fx.DEFAULT_FROM_META else step
+    def disk_sort(self, key=lambda i: i, reverse=False, step=arg.DEFAULT, verbose=False):
+        step = arg.undefault(step, self.max_items_in_memory)
         flux_parts = self.split_to_disk_by_step(
             step=step,
             sort_each_by=key, reverse=reverse,
@@ -473,9 +475,9 @@ class AnyFlux:
             **props
         )
 
-    def sort(self, *keys, reverse=False, step=fx.DEFAULT_FROM_META, verbose=True):
-        keys = fx.update_arg(keys)
-        step = self.max_items_in_memory if fx.DEFAULT_FROM_META else step
+    def sort(self, *keys, reverse=False, step=arg.DEFAULT, verbose=True):
+        keys = arg.update(keys)
+        step = arg.undefault(step, self.max_items_in_memory)
         if len(keys) == 0:
             key = lambda i: i
         elif len(keys) == 1:
