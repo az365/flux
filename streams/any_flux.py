@@ -85,6 +85,22 @@ class AnyFlux:
         else:
             raise TypeError('to parameter must be class or FluxType (got {})'.format(type(to)))
 
+    def get_property(self, name, *args, **kwargs):
+        if callable(name):
+            value = name(self)
+        elif isinstance(name, str):
+            meta = self.get_meta()
+            if name in meta:
+                value = meta.get(name)
+            else:
+                try:
+                    value = self.__getattribute__(name)(*args, **kwargs)
+                except AttributeError:
+                    value = None
+        else:
+            raise TypeError('property name must be function, meta-field or attribute name')
+        return value
+
     @staticmethod
     def is_valid_item(item):
         return True
@@ -557,13 +573,13 @@ class AnyFlux:
         else:
             print(self.one())
 
+    def print(self, flux_function='count', *args, **kwargs):
+        value = self.get_property(flux_function, *args, **kwargs)
+        print(value)
+        return self
+
     def submit(self, external_object=print, flux_function='count', key=None, show=False):
-        if callable(flux_function):
-            value = flux_function(self)
-        elif isinstance(flux_function, str):
-            value = self.get_meta().get(flux_function)
-        else:
-            raise TypeError('flux_function must be function or get_meta-field')
+        value = self.get_property(flux_function)
         if key is not None:
             value = {key: value}
         if show:
