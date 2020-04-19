@@ -1,10 +1,10 @@
 try:  # Assume we're a sub-module in a package.
     from . import fluxes as fx
-    from . import mappers_and_reducers as mr
+    from utils import mappers as ms
     from . import readers
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     import fluxes as fx
-    import mappers_and_reducers as mr
+    from utils import mappers as ms
     import readers
 
 
@@ -455,7 +455,7 @@ def test_calc_histogram():
         y=('y', int),
         z=('z', int),
     ).apply(
-        lambda a: mr.get_histograms(a, fields=['x', 'y']),
+        lambda a: ms.get_histograms(a, fields=['x', 'y']),
         native=False,
     ).get_list()
     assert received == expected
@@ -463,7 +463,7 @@ def test_calc_histogram():
 
 def test_norm_text():
     expected = 'абв gb'
-    received = mr.norm_text(
+    received = ms.norm_text(
         '\t Абв 123 Gb\n'
     )
     assert received == expected
@@ -478,7 +478,7 @@ def test_sum_by_keys():
             {'a': 1, 'b': 2, 'h': 2},
         ],
     ).apply(
-        lambda a: mr.sum_by_keys(
+        lambda a: ms.sum_by_keys(
             a,
             keys=('b', 'a'),
             counters=('h', ),
