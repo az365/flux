@@ -86,18 +86,23 @@ def get_key_function(descriptions, take_hash=False):
 
 
 class RecordsFlux(fx.AnyFlux):
-    def __init__(self, items, count=None, check=True):
+    def __init__(
+            self,
+            items,
+            count=None,
+            check=True,
+            max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
+            tmp_files_template=fx.TMP_FILES_TEMPLATE,
+            tmp_files_encoding=fx.TMP_FILES_ENCODING,
+    ):
         super().__init__(
             items=check_records(items) if check else items,
             count=count,
+            max_items_in_memory=max_items_in_memory,
+            tmp_files_template=tmp_files_template,
+            tmp_files_encoding=tmp_files_encoding,
         )
         self.check = check
-
-    def get_meta(self):
-        return dict(
-            count=self.count,
-            check=self.check,
-        )
 
     @staticmethod
     def is_valid_item(item):
@@ -164,14 +169,15 @@ class RecordsFlux(fx.AnyFlux):
             self,
             *keys,
             reverse=False,
-            step=fx.MAX_ITEMS_IN_MEMORY, tmp_file_template='merge_sort_{}', encoding='utf8',
+            step=fx.DEFAULT_FROM_META,
             verbose=True,
     ):
         key_function = get_key_function(keys)
+        step = self.max_items_in_memory if step == fx.DEFAULT_FROM_META else step
         if self.is_in_memory() or (step is None) or (self.count is not None and self.count <= step):
             return self.memory_sort(key_function, reverse)
         else:
-            return self.disk_sort(key_function, reverse, step, tmp_file_template, encoding, verbose)
+            return self.disk_sort(key_function, reverse, step=step, verbose=verbose)
 
     def sorted_group_by(self, *keys, as_pairs=True):
         keys = fx.update_arg(keys)
@@ -200,8 +206,9 @@ class RecordsFlux(fx.AnyFlux):
             )
         return fx_groups.to_memory() if self.is_in_memory() else fx_groups
 
-    def group_by(self, *keys, step=None, as_pairs=True, verbose=True):
+    def group_by(self, *keys, step=fx.DEFAULT_FROM_META, as_pairs=True, verbose=True):
         keys = fx.update_arg(keys)
+        step = self.max_items_in_memory if step == fx.DEFAULT_FROM_META else step
         if not as_pairs:
             keys = [
                 get_key_function(keys, take_hash=True),

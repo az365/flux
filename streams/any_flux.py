@@ -34,14 +34,24 @@ def merge_iter(iterables, key_function, reverse=False):
 
 
 class AnyFlux:
-    def __init__(self, items, count=None):
+    def __init__(
+            self,
+            items,
+            count=None,
+            max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
+            tmp_files_template=fx.TMP_FILES_TEMPLATE,
+            tmp_files_encoding=fx.TMP_FILES_ENCODING,
+    ):
         self.items = items
         self.count = count
+        self.max_items_in_memory = max_items_in_memory
+        self.tmp_files_template = tmp_files_template
+        self.tmp_files_encoding = tmp_files_encoding
 
     def get_meta(self):
-        return dict(
-            count=self.count,
-        )
+        meta = self.__dict__.copy()
+        meta.pop('items')
+        return meta
 
     def set_meta(self, **meta):
         return self.__class__(
@@ -381,14 +391,17 @@ class AnyFlux:
 
     def split_to_disk_by_step(
             self,
-            step=fx.MAX_ITEMS_IN_MEMORY,
-            tmp_file_template='split_to_disk_by_step_{}.tmp', encoding='utf8',
+            step=fx.DEFAULT_FROM_META,
+            file_template=fx.DEFAULT_FROM_META, encoding=fx.DEFAULT_FROM_META,
             sort_each_by=None, reverse=False,
             verbose=True,
     ):
         count, total_fx = self.count, self
+        step = self.max_items_in_memory if step == fx.DEFAULT_FROM_META else step
+        file_template = self.tmp_files_template if file_template == fx.DEFAULT_FROM_META else file_template
+        encoding = self.tmp_files_encoding if encoding == fx.DEFAULT_FROM_META else encoding
         if count is None:
-            total_fn = tmp_file_template.format('total')
+            total_fn = file_template.format('total')
             if verbose:
                 print('Collecting input into {}'.format(total_fn))
             count, total_fx = self.to_json().to_file(
@@ -400,7 +413,7 @@ class AnyFlux:
         part_start, part_no, sorted_parts = 0, None, list()
         while part_start < count:
             part_no = int(part_start / step)
-            part_fn = tmp_file_template.format(part_no)
+            part_fn = file_template.format(part_no)
             if verbose:
                 print('Sorting part {} and saving into {}'.format(part_no, part_fn))
             part_fx = total_fx.take(step)
@@ -441,18 +454,11 @@ class AnyFlux:
             **self.get_meta()
         )
 
-    def disk_sort(
-            self,
-            key=lambda i: i,
-            reverse=False,
-            step=fx.MAX_ITEMS_IN_MEMORY,
-            tmp_file_template='merge_sort_{}.tmp', encoding='utf8',
-            verbose=False,
-    ):
+    def disk_sort(self, key=lambda i: i, reverse=False, step=fx.DEFAULT_FROM_META, verbose=False):
+        step = self.max_items_in_memory if step == fx.DEFAULT_FROM_META else step
         flux_parts = self.split_to_disk_by_step(
             step=step,
             sort_each_by=key, reverse=reverse,
-            tmp_file_template=tmp_file_template, encoding=encoding,
             verbose=verbose,
         )
         assert flux_parts, 'streams must be non-empty'
@@ -467,14 +473,9 @@ class AnyFlux:
             **props
         )
 
-    def sort(
-            self,
-            *keys,
-            reverse=False,
-            step=fx.MAX_ITEMS_IN_MEMORY, tmp_file_template='merge_sort_{}', encoding='utf8',
-            verbose=True,
-    ):
-        keys=fx.update_arg(keys)
+    def sort(self, *keys, reverse=False, step=fx.DEFAULT_FROM_META, verbose=True):
+        keys = fx.update_arg(keys)
+        step = self.max_items_in_memory if fx.DEFAULT_FROM_META else step
         if len(keys) == 0:
             key = lambda i: i
         elif len(keys) == 1:
@@ -484,7 +485,7 @@ class AnyFlux:
         if self.is_in_memory() or (step is None) or (self.count is not None and self.count <= step):
             return self.memory_sort(key, reverse)
         else:
-            return self.disk_sort(key, reverse, step, tmp_file_template, encoding, verbose)
+            return self.disk_sort(key, reverse, step, verbose)
 
     def get_list(self):
         return list(self.items)

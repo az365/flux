@@ -71,20 +71,25 @@ def apply_schema_to_row(row, schema, skip_bad_values=False, verbose=True):
 
 
 class SchemaFlux(fx.RowsFlux):
-    def __init__(self, items, count=None, check=True, schema=None):
+    def __init__(
+            self,
+            items,
+            count=None,
+            check=True,
+            schema=None,
+            max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
+            tmp_files_template=fx.TMP_FILES_TEMPLATE,
+            tmp_files_encoding=fx.TMP_FILES_ENCODING,
+    ):
         super().__init__(
             items=check_rows(items, schema) if check else items,
             count=count,
             check=check,
+            max_items_in_memory=max_items_in_memory,
+            tmp_files_template=tmp_files_template,
+            tmp_files_encoding=tmp_files_encoding,
         )
         self.schema = schema or list()
-
-    def get_meta(self):
-        return dict(
-            count=self.count(),
-            check=self.check(),
-            schema=self.schema(),
-        )
 
     def is_valid_item(self, item):
         return is_valid(

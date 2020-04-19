@@ -35,20 +35,25 @@ def check_lines(lines, skip_errors=False):
 
 
 class LinesFlux(fx.AnyFlux):
-    def __init__(self, items, count=None, check=True, source=None):
+    def __init__(
+            self,
+            items,
+            count=None,
+            check=True,
+            source=None,
+            max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
+            tmp_files_template=fx.TMP_FILES_TEMPLATE,
+            tmp_files_encoding=fx.TMP_FILES_ENCODING,
+    ):
         super().__init__(
             check_lines(items) if check else items,
             count=count,
+            max_items_in_memory=max_items_in_memory,
+            tmp_files_template=tmp_files_template,
+            tmp_files_encoding=tmp_files_encoding,
         )
         self.check = check
         self.source = source
-
-    def get_meta(self):
-        return dict(
-            count=self.count,
-            check=self.check,
-            source=self.source,
-        )
 
     @staticmethod
     def is_valid_item(item):

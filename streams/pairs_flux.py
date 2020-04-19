@@ -27,24 +27,29 @@ def get_key(pair):
 
 
 class PairsFlux(fx.RowsFlux):
-    def __init__(self, items, count=None, check=True, secondary=None):
+    def __init__(
+            self,
+            items,
+            count=None,
+            check=True,
+            secondary=None,
+            max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
+            tmp_files_template=fx.TMP_FILES_TEMPLATE,
+            tmp_files_encoding=fx.TMP_FILES_ENCODING,
+    ):
         super().__init__(
             items=check_pairs(items) if check else items,
             count=count,
             check=check,
+            max_items_in_memory=max_items_in_memory,
+            tmp_files_template=tmp_files_template,
+            tmp_files_encoding=tmp_files_encoding,
         )
         if secondary is None:
             self.secondary = fx.FluxType.AnyFlux
         else:
             assert secondary in fx.FluxType
             self.secondary = secondary or fx.FluxType.AnyFlux
-
-    def get_meta(self):
-        return dict(
-            count=self.count,
-            check=self.check,
-            secondary=self.secondary,
-        )
 
     def is_valid_item(self, item):
         return is_pair(
@@ -78,13 +83,12 @@ class PairsFlux(fx.RowsFlux):
     def disk_sort_by_key(
             self,
             reverse=False,
-            step=fx.MAX_ITEMS_IN_MEMORY,
-            tmp_file_template='merge_sort_by_key_{}.tmp',
+            step=fx.DEFAULT_FROM_META,
     ):
+        step = self.max_items_in_memory if step == fx.DEFAULT_FROM_META else step
         return self.disk_sort(
             key=get_key,
             reverse=reverse,
-            tmp_file_template=tmp_file_template,
             step=step,
         )
 
@@ -159,8 +163,10 @@ class PairsFlux(fx.RowsFlux):
             flux_for_items,
         )
 
-    def extract_keys_on_disk(self, tmp_file_template, encoding='utf8'):
-        filename = tmp_file_template.format('json') if '{}' in tmp_file_template else tmp_file_template
+    def extract_keys_on_disk(self, file_template=None, encoding='default'):
+        encoding = self.tmp_files_encoding if encoding == 'default' else encoding
+        file_template = file_template or self.tmp_files_template
+        filename = file_template.format('json') if '{}' in file_template else file_template
         self.to_records().to_json().to_file(
             filename,
             encoding=encoding,
@@ -170,11 +176,11 @@ class PairsFlux(fx.RowsFlux):
             readers.from_file(filename, encoding).to_records().to_pairs('key', 'value'),
         )
 
-    def extract_keys(self, tmp_file_template=None):
-        if tmp_file_template is None:
+    def extract_keys(self):
+        if self.is_in_memory():
             return self.extract_keys_in_memory()
         else:
-            return self.extract_keys_on_disk(tmp_file_template)
+            return self.extract_keys_on_disk()
 
     def get_dict(self, of_lists=False):
         result = dict()

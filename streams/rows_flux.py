@@ -48,18 +48,23 @@ def select_columns(row_in, *columns):
 
 
 class RowsFlux(fx.AnyFlux):
-    def __init__(self, items, count=None, check=True):
+    def __init__(
+            self,
+            items,
+            count=None,
+            check=True,
+            max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
+            tmp_files_template=fx.TMP_FILES_TEMPLATE,
+            tmp_files_encoding=fx.TMP_FILES_ENCODING,
+    ):
         super().__init__(
             items=check_rows(items) if check else items,
             count=count,
+            max_items_in_memory=max_items_in_memory,
+            tmp_files_template=tmp_files_template,
+            tmp_files_encoding=tmp_files_encoding,
         )
         self.check = check
-
-    def get_meta(self):
-        return dict(
-            count=self.count,
-            check=self.check,
-        )
 
     @staticmethod
     def is_valid_item(item):
