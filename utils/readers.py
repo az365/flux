@@ -1,7 +1,7 @@
 import gzip
 
 try:  # Assume we're a sub-module in a package.
-    from . import fluxes as fx
+    from flux import fluxes as fx
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     import fluxes as fx
 

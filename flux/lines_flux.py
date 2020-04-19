@@ -2,11 +2,11 @@ import sys
 import json
 import csv
 
+import fluxes as fx
+
 try:
-    from . import fluxes as fx
-    from . import readers
+    from utils import readers
 except ImportError:
-    import fluxes as fx
     import readers
 
 max_int = sys.maxsize

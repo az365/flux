@@ -1,8 +1,8 @@
+import fluxes as fx
+
 try:  # Assume we're a sub-module in a package.
-    from . import fluxes as fx
-    from . import readers
+    from utils import readers
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
-    import fluxes as fx
     import readers
 
 
