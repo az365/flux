@@ -181,7 +181,7 @@ class AnyFlux:
         fx_class = self.get_class(to)
         new_props_keys = fx_class([]).get_meta().keys()
         props = {k: v for k, v in self.get_meta().items() if k in new_props_keys}
-        items = map(function, self.items)
+        items = map(function, self.iterable())
         if self.is_in_memory():
             items = list(items)
         return fx_class(
@@ -191,7 +191,7 @@ class AnyFlux:
 
     def flat_map(self, function=lambda i: i, to=None):
         def get_items():
-            for i in self.items:
+            for i in self.iterable():
                 yield from function(i)
         fx_class = self.get_class(to)
         new_props_keys = fx_class([]).get_meta().keys()
@@ -210,7 +210,7 @@ class AnyFlux:
             return True
         props = self.get_meta()
         props.pop('count')
-        filtered_items = filter(filter_function, self.items)
+        filtered_items = filter(filter_function, self.iterable())
         if self.is_in_memory():
             filtered_items = list(filtered_items)
             props['count'] = len(filtered_items)
@@ -220,7 +220,7 @@ class AnyFlux:
         )
 
     def enumerated_items(self):
-        for n, i in enumerate(self.items):
+        for n, i in enumerate(self.iterable()):
             yield n, i
 
     def enumerate(self, native=False):
@@ -278,7 +278,7 @@ class AnyFlux:
             )
 
     def add_items(self, items, before=False):
-        old_items = self.items
+        old_items = self.iterable()
         new_items = items
         if before:
             chain_records = chain(new_items, old_items)

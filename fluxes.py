@@ -13,6 +13,7 @@ try:  # Assume we're a sub-module in a package.
     from streams.pairs_flux import PairsFlux
     from streams.schema_flux import SchemaFlux
     from streams.records_flux import RecordsFlux
+    from streams.pandas_flux import PandasFlux
     from utils import arguments as arg
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .streams.any_flux import AnyFlux
@@ -21,6 +22,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     from .streams.pairs_flux import PairsFlux
     from .streams.schema_flux import SchemaFlux
     from .streams.records_flux import RecordsFlux
+    from .streams.pandas_flux import PandasFlux
     from .utils import arguments as arg
 
 
@@ -31,6 +33,7 @@ class FluxType(Enum):
     PairsFlux = 'PairsFlux'
     SchemaFlux = 'SchemaFlux'
     RecordsFlux = 'RecordsFlux'
+    PandasFlux = 'PandasFlux'
 
 
 def get_class(flux_type):
@@ -49,12 +52,14 @@ def get_class(flux_type):
         return SchemaFlux
     elif flux_type == FluxType.RecordsFlux:
         return RecordsFlux
+    elif flux_type == FluxType.PandasFlux:
+        return PandasFlux
 
 
 def is_flux(obj):
     return isinstance(
         obj,
-        (AnyFlux, LinesFlux, RowsFlux, PairsFlux, SchemaFlux, RecordsFlux),
+        (AnyFlux, LinesFlux, RowsFlux, PairsFlux, SchemaFlux, RecordsFlux, PandasFlux),
     )
 
 
