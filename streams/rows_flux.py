@@ -79,6 +79,24 @@ class RowsFlux(fx.AnyFlux):
             verbose=verbose,
         )
 
+    def from_csv_file(
+            self,
+            filename,
+            encoding=None, gz=False,
+            delimiter='\t',
+            skip_first_line=False, max_n=None,
+            verbose=False,
+    ):
+        fx_rows = fx.LinesFlux().from_file(
+            filename,
+            encoding=encoding, gz=gz,
+            skip_first_line=skip_first_line, max_n=max_n,
+            verbose=True,
+        ).to_rows(
+            delimiter=delimiter
+        )
+        return self.add_flux(fx_rows)
+
     def to_lines(self, delimiter='\t'):
         return fx.LinesFlux(
             map(lambda r: '\t'.join([str(c) for c in r]), self.items),

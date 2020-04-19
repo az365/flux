@@ -5,10 +5,16 @@ import csv
 
 try:
     import fluxes as fx
-    from utils import readers
+    from utils import (
+        functions as fs,
+        readers
+    )
 except ImportError:
     from .. import fluxes as fx
-    from ..utils import readers
+    from ..utils import (
+        functions as fs,
+        readers
+    )
 
 max_int = sys.maxsize
 while True:  # To prevent _csv.Error: field larger than field limit (131072)
@@ -37,7 +43,7 @@ def check_lines(lines, skip_errors=False):
 class LinesFlux(fx.AnyFlux):
     def __init__(
             self,
-            items,
+            items=[],
             count=None,
             check=True,
             source=None,
@@ -63,7 +69,7 @@ class LinesFlux(fx.AnyFlux):
     def valid_items(items, skip_errors=False):
         return check_lines(items, skip_errors)
 
-    def parse_json(self, default_value=None):
+    def parse_json(self, default_value=None, to=fx.FluxType.RecordsFlux):
         def json_loads(line):
             try:
                 return json.loads(line)
@@ -72,11 +78,30 @@ class LinesFlux(fx.AnyFlux):
                     return default_value
                 else:
                     raise json.JSONDecodeError(err.msg, err.doc, err.pos)
-        return self.map_to_records(
+        return self.map(
             json_loads,
+            to=to,
         ).set_meta(
             count=self.count,
         )
+
+    def from_file(
+            self,
+            filename,
+            encoding=None, gz=False,
+            skip_first_line=False, max_n=None,
+            verbose=False, step_n=readers.VERBOSE_STEP,
+    ):
+        fx_lines = readers.from_file(
+            filename,
+            encoding=encoding, gz=gz,
+            skip_first_line=skip_first_line, max_n=max_n,
+            verbose=verbose, step_n=step_n,
+        )
+        is_inherited = fx_lines.flux_type() != self.flux_type()
+        if is_inherited:
+            fx_lines = fx_lines.map(function=fs.same(), to=self.flux_type())
+        return self.add_flux(fx_lines)
 
     def lazy_save(self, filename, encoding=None, end='\n', verbose=True, immediately=False):
         def write_and_yield(fh, lines):

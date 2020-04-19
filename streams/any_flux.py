@@ -101,6 +101,23 @@ class AnyFlux:
             raise TypeError('property name must be function, meta-field or attribute name')
         return value
 
+    def from_json_file(
+            self,
+            filename,
+            encoding=None, gz=False,
+            skip_first_line=False, max_n=None,
+            verbose=False,
+    ):
+        parsed_flux = fx.LinesFlux.from_file(
+            filename,
+            encoding=encoding, gz=gz,
+            skip_first_line=skip_first_line, max_n=max_n,
+            verbose=verbose,
+        ).parse_json(
+            to=self.flux_type(),
+        )
+        return self.add_flux(parsed_flux)
+
     @staticmethod
     def is_valid_item(item):
         return True
