@@ -2,10 +2,16 @@ import pandas as pd
 
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
-    from utils import arguments as arg
+    from utils import (
+        arguments as arg,
+        selection,
+    )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
-    from ..utils import arguments as arg
+    from ..utils import (
+        arguments as arg,
+        selection,
+    )
 
 
 def is_record(item):
@@ -23,64 +29,13 @@ def check_records(records, skip_errors=False):
         yield r
 
 
-def topologically_sorted(selectors):
-    ordered_fields = list()
-    unordered_fields = list()
-    unresolved_dependencies = dict()
-    for field, description in selectors.items():
-        unordered_fields.append(field)
-        _, dependencies = fx.process_selector_description(description)
-        unresolved_dependencies[field] = [d for d in dependencies if d in selectors.keys() and d != field]
-    while unordered_fields:  # Kahn's algorithm
-        for field in unordered_fields:
-            if not unresolved_dependencies[field]:
-                ordered_fields.append(field)
-                unordered_fields.remove(field)
-                for f in unordered_fields:
-                    if field in unresolved_dependencies[f]:
-                        unresolved_dependencies[f].remove(field)
-    return [(f, selectors[f]) for f in ordered_fields]
-
-
-def select_value(record, description):
-    if callable(description):
-        return description(record)
-    elif isinstance(description, (list, tuple)):
-        function, fields = fx.process_selector_description(description)
-        values = [record.get(f) for f in fields]
-        return function(*values)
-    else:
-        return record.get(description)
-
-
-def select_fields(rec_in, *descriptions):
-    record = rec_in.copy()
-    fields_out = list()
-    for desc in descriptions:
-        if desc == '*':
-            fields_out += list(rec_in.keys())
-        elif isinstance(desc, (list, tuple)):
-            if len(desc) > 1:
-                f_out = desc[0]
-                fs_in = desc[1] if len(desc) == 2 else desc[1:]
-                record[f_out] = select_value(record, fs_in)
-                fields_out.append(f_out)
-            else:
-                raise ValueError('incorrect selector: {}'.format(desc))
-        else:
-            if desc not in record:
-                record[desc] = None
-            fields_out.append(desc)
-    return {f: record[f] for f in fields_out}
-
-
 def get_key_function(descriptions, take_hash=False):
     if len(descriptions) == 0:
         raise ValueError('key must be defined')
     elif len(descriptions) == 1:
-        key_function = lambda r: select_value(r, descriptions[0])
+        key_function = lambda r: selection.value_from_record(r, descriptions[0])
     else:
-        key_function = lambda r: tuple([select_value(r, d) for d in descriptions])
+        key_function = lambda r: tuple([selection.value_from_record(r, d) for d in descriptions])
     if take_hash:
         return lambda r: hash(key_function(r))
     else:
@@ -141,19 +96,19 @@ class RecordsFlux(fx.AnyFlux):
 
     def select(self, *fields, **selectors):
         descriptions = list(fields)
-        for k, v in topologically_sorted(selectors):
+        for k, v in selection.topologically_sorted(selectors):
             if isinstance(v, (list, tuple)):
                 descriptions.append([k] + list(v)),
             else:
                 descriptions.append([k] + [v])
         return self.native_map(
-            lambda r: select_fields(r, *descriptions),
+            lambda r: selection.get_fields(r, *descriptions),
         )
 
     def filter(self, *fields):
         def filter_function(r):
             for f in fields:
-                if not select_value(r, f):
+                if not selection.value_from_record(r, f):
                     return False
             return True
         props = self.get_meta()
@@ -274,8 +229,8 @@ class RecordsFlux(fx.AnyFlux):
     def to_pairs(self, key, value=None):
         def get_pairs():
             for i in self.items:
-                k = select_value(i, key)
-                v = i if value is None else select_value(i, value)
+                k = selection.value_from_record(i, key)
+                v = i if value is None else selection.value_from_record(i, value)
                 yield k, v
         return fx.PairsFlux(
             list(get_pairs()) if self.is_in_memory() else get_pairs(),

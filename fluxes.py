@@ -13,6 +13,7 @@ try:  # Assume we're a sub-module in a package.
     from streams.pairs_flux import PairsFlux
     from streams.schema_flux import SchemaFlux
     from streams.records_flux import RecordsFlux
+    from utils import arguments as arg
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .streams.any_flux import AnyFlux
     from .streams.lines_flux import LinesFlux
@@ -20,6 +21,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     from .streams.pairs_flux import PairsFlux
     from .streams.schema_flux import SchemaFlux
     from .streams.records_flux import RecordsFlux
+    from .utils import arguments as arg
 
 
 class FluxType(Enum):
@@ -57,24 +59,8 @@ def is_flux(obj):
 
 
 def concat(*list_fluxes):
-    list_fluxes = update_arg(list_fluxes)
+    list_fluxes = arg.update(list_fluxes)
     result = list_fluxes[0]
     for cur_flux in list_fluxes[1:]:
         result = result.add_flux(cur_flux)
     return result
-
-
-def process_selector_description(d):
-    if callable(d):
-        function, inputs = d, list()
-    elif isinstance(d, (list, tuple)):
-        if callable(d[0]):
-            function, inputs = d[0], d[1:]
-        elif callable(d[-1]):
-            inputs, function = d[:-1], d[-1]
-        else:
-            inputs, function = d, lambda *a: tuple(a)
-    else:
-        inputs, function = [d], lambda v: v
-    return function, inputs
-
