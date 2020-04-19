@@ -1,12 +1,8 @@
+import fluxes as fx
 from utils import (
     mappers as ms,
     readers,
 )
-
-try:  # Assume we're a sub-module in a package.
-    from flux import fluxes as fx
-except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
-    import fluxes as fx
 
 
 EXAMPLE_FILENAME = 'test_file.tmp'

@@ -4,9 +4,9 @@ import inspect
 import json
 
 try:  # Assume we're a sub-module in a package.
-    from . import fluxes as fx
-except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     import fluxes as fx
+except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
+    from .. import fluxes as fx
 
 
 def merge_iter(iterables, key_function, reverse=False):
@@ -455,7 +455,7 @@ class AnyFlux:
             tmp_file_template=tmp_file_template, encoding=encoding,
             verbose=verbose,
         )
-        assert flux_parts, 'flux must be non-empty'
+        assert flux_parts, 'streams must be non-empty'
         iterables = [f.iterable() for f in flux_parts]
         counts = [f.count for f in flux_parts]
         props = self.meta()

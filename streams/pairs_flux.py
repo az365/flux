@@ -1,9 +1,9 @@
-import fluxes as fx
-
 try:  # Assume we're a sub-module in a package.
+    import fluxes as fx
     from utils import readers
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
-    import readers
+    from .. import fluxes as fx
+    from ..utils import readers
 
 
 def is_pair(row):

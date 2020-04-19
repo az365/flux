@@ -1,9 +1,9 @@
 import gzip
 
 try:  # Assume we're a sub-module in a package.
-    from flux import fluxes as fx
-except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     import fluxes as fx
+except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
+    from .. import fluxes as fx
 
 
 VERBOSE_STEP = 10000

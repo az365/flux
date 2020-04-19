@@ -2,12 +2,13 @@ import sys
 import json
 import csv
 
-import fluxes as fx
 
 try:
+    import fluxes as fx
     from utils import readers
 except ImportError:
-    import readers
+    from .. import fluxes as fx
+    from ..utils import readers
 
 max_int = sys.maxsize
 while True:  # To prevent _csv.Error: field larger than field limit (131072)

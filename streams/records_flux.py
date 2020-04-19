@@ -1,9 +1,9 @@
 import pandas as pd
 
 try:  # Assume we're a sub-module in a package.
-    from . import fluxes as fx
-except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     import fluxes as fx
+except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
+    from .. import fluxes as fx
 
 
 def is_record(item):
