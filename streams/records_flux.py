@@ -4,12 +4,14 @@ try:  # Assume we're a sub-module in a package.
     import fluxes as fx
     from utils import (
         arguments as arg,
+        functions as fs,
         selection,
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
     from ..utils import (
         arguments as arg,
+        functions as fs,
         selection,
     )
 
@@ -33,9 +35,9 @@ def get_key_function(descriptions, take_hash=False):
     if len(descriptions) == 0:
         raise ValueError('key must be defined')
     elif len(descriptions) == 1:
-        key_function = lambda r: selection.value_from_record(r, descriptions[0])
+        key_function = fs.partial(selection.value_from_record, descriptions[0])
     else:
-        key_function = lambda r: tuple([selection.value_from_record(r, d) for d in descriptions])
+        key_function = fs.partial(selection.tuple_from_record, descriptions)
     if take_hash:
         return lambda r: hash(key_function(r))
     else:

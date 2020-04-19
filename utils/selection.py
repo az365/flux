@@ -58,6 +58,10 @@ def value_from_record(record, description):
         return record.get(description)
 
 
+def tuple_from_record(record, descriptions):
+    return tuple([value_from_record(record, d) for d in descriptions])
+
+
 def get_columns(row_in, *columns):
     row_out = [None] * len(columns)
     c = 0

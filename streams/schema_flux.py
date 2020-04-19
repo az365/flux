@@ -1,11 +1,12 @@
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
+    from utils import functions as fs
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
+    from ..utils import functions as fs
 
 
-NAME_POS, TYPE_POS, HINT_POS = 0, 1, 2
-TYPE_CONV_FUNCS = dict(bool=bool, int=int, float=float, str=str, text=str, date=str)
+NAME_POS, TYPE_POS, HINT_POS = 0, 1, 2  # schema fields
 
 
 def is_row(row):
@@ -17,10 +18,10 @@ def is_valid(row, schema):
         if schema is not None:
             for value, description in zip(row, schema):
                 field_type = description[TYPE_POS]
-                if field_type in TYPE_CONV_FUNCS.values():
+                if field_type in fs.DICT_CAST_TYPES.values():
                     return isinstance(value, field_type)
-                elif field_type == TYPE_CONV_FUNCS.keys():
-                    selected_type = TYPE_CONV_FUNCS[field_type]
+                elif field_type == fs.DICT_CAST_TYPES.keys():
+                    selected_type = fs.DICT_CAST_TYPES[field_type]
                     return isinstance(value, selected_type)
         else:
             return True
@@ -37,22 +38,12 @@ def check_rows(rows, schema, skip_errors=False):
         yield r
 
 
-def get_cast_function(field_type):
-    return TYPE_CONV_FUNCS[field_type]
-
-
-def cast(value, field_type, default_int=0):
-    cast_function = get_cast_function(field_type)
-    if value in (None, 'None', '') and field_type in ('int', int):
-        value = default_int
-    return cast_function(value)
-
-
 def apply_schema_to_row(row, schema, skip_bad_values=False, verbose=True):
     for c, (value, description) in enumerate(zip(row, schema)):
         field_type = description[TYPE_POS]
         try:
-            new_value = cast(value, field_type)
+            cast_function = fs.cast(field_type)
+            new_value = cast_function(value)
         except ValueError as e:
             field_name = description[NAME_POS]
             if verbose:
@@ -62,9 +53,12 @@ def apply_schema_to_row(row, schema, skip_bad_values=False, verbose=True):
                         value, field_type,
                     )
                 )
-            if not skip_bad_values:
+            if skip_bad_values:
                 if verbose:
                     print('Error in row:', str(list(zip(row, schema)))[:80], '...')
+                new_value = None
+            else:
+                print('Error in row:', str(list(zip(row, schema)))[:80], '...')
                 raise e
         row[c] = new_value
     return row
