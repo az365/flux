@@ -38,7 +38,7 @@ class AnyFlux:
         self.items = items
         self.count = count
 
-    def meta(self):
+    def get_meta(self):
         return dict(
             count=self.count,
         )
@@ -50,7 +50,7 @@ class AnyFlux:
         )
 
     def update_meta(self, **meta):
-        props = self.meta()
+        props = self.get_meta()
         props.update(meta)
         return self.__class__(
             self.items,
@@ -84,7 +84,7 @@ class AnyFlux:
     def validated(self, skip_errors=False):
         return self.__class__(
             self.valid_items(self.items, skip_errors=skip_errors),
-            **self.meta()
+            **self.get_meta()
         )
 
     def iterable(self):
@@ -124,13 +124,13 @@ class AnyFlux:
         self.items, copy_items = tee(self.items, 2)
         return self.__class__(
             copy_items,
-            **self.meta()
+            **self.get_meta()
         )
 
     def apply(self, function, native=True, save_count=False):
         if native:
             target_class = self.__class__
-            props = self.meta()
+            props = self.get_meta()
             if not save_count:
                 props.pop('count')
         else:
@@ -167,8 +167,8 @@ class AnyFlux:
 
     def map(self, function=lambda i: i, to=None):
         fx_class = self.get_class(to)
-        new_props_keys = fx_class([]).meta().keys()
-        props = {k: v for k, v in self.meta().items() if k in new_props_keys}
+        new_props_keys = fx_class([]).get_meta().keys()
+        props = {k: v for k, v in self.get_meta().items() if k in new_props_keys}
         items = map(function, self.items)
         if self.is_in_memory():
             items = list(items)
@@ -182,8 +182,8 @@ class AnyFlux:
             for i in self.items:
                 yield from function(i)
         fx_class = self.get_class(to)
-        new_props_keys = fx_class([]).meta().keys()
-        props = {k: v for k, v in self.meta().items() if k in new_props_keys}
+        new_props_keys = fx_class([]).get_meta().keys()
+        props = {k: v for k, v in self.get_meta().items() if k in new_props_keys}
         props.pop('count')
         return fx_class(
             get_items(),
@@ -196,7 +196,7 @@ class AnyFlux:
                 if not f(item):
                     return False
             return True
-        props = self.meta()
+        props = self.get_meta()
         props.pop('count')
         filtered_items = filter(filter_function, self.items)
         if self.is_in_memory():
@@ -212,7 +212,7 @@ class AnyFlux:
             yield n, i
 
     def enumerate(self, native=False):
-        props = self.meta()
+        props = self.get_meta()
         if native:
             target_class = self.__class__
         else:
@@ -229,7 +229,7 @@ class AnyFlux:
                 yield i
                 if n + 1 >= m:
                     break
-        props = self.meta()
+        props = self.get_meta()
         props['count'] = min(self.count, max_count) if self.count else None
         return self.__class__(
             take_items(max_count),
@@ -242,7 +242,7 @@ class AnyFlux:
                 if n >= c:
                     yield i
         next_items = self.items[count:] if self.is_in_memory() else skip_items(count)
-        props = self.meta()
+        props = self.get_meta()
         props['count'] = self.count - count if self.count else None
         return self.__class__(
             next_items,
@@ -272,7 +272,7 @@ class AnyFlux:
             chain_records = chain(new_items, old_items)
         else:
             chain_records = chain(old_items, new_items)
-        props = self.meta()
+        props = self.get_meta()
         props['count'] = None
         return self.__class__(
             chain_records,
@@ -307,7 +307,7 @@ class AnyFlux:
 
     def separate_first(self):
         items = self.iterable()
-        props = self.meta()
+        props = self.get_meta()
         if props.get('count'):
             props['count'] -= 1
         title_item = next(items)
@@ -420,7 +420,7 @@ class AnyFlux:
                     break
             return output_items
         items = take_items()
-        props = self.meta()
+        props = self.get_meta()
         while items:
             props['count'] = len(items)
             yield self.__class__(
@@ -438,7 +438,7 @@ class AnyFlux:
         self.count = len(sorted_items)
         return self.__class__(
             sorted_items,
-            **self.meta()
+            **self.get_meta()
         )
 
     def disk_sort(
@@ -458,7 +458,7 @@ class AnyFlux:
         assert flux_parts, 'streams must be non-empty'
         iterables = [f.iterable() for f in flux_parts]
         counts = [f.count for f in flux_parts]
-        props = self.meta()
+        props = self.get_meta()
         props['count'] = sum(counts)
         if verbose:
             print('Merging {} parts...'.format(len(iterables)))
@@ -494,7 +494,7 @@ class AnyFlux:
 
     def to_memory(self):
         items_as_list_in_memory = self.get_list()
-        props = self.meta()
+        props = self.get_meta()
         props['count'] = len(items_as_list_in_memory)
         if 'check' in props:
             props['check'] = False
@@ -547,7 +547,7 @@ class AnyFlux:
         return self.map_to_records(function)
 
     def show(self, count=3):
-        print(self.class_name(), self.meta(), '\n')
+        print(self.class_name(), self.get_meta(), '\n')
         if self.is_in_memory():
             for i in self.items[:count]:
                 print(i)
@@ -558,9 +558,9 @@ class AnyFlux:
         if callable(flux_function):
             value = flux_function(self)
         elif isinstance(flux_function, str):
-            value = self.meta().get(flux_function)
+            value = self.get_meta().get(flux_function)
         else:
-            raise TypeError('flux_function must be function or meta-field')
+            raise TypeError('flux_function must be function or get_meta-field')
         if key is not None:
             value = {key: value}
         if show:

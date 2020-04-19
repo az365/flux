@@ -93,7 +93,7 @@ class RecordsFlux(fx.AnyFlux):
         )
         self.check = check
 
-    def meta(self):
+    def get_meta(self):
         return dict(
             count=self.count,
             check=self.check,
@@ -119,7 +119,7 @@ class RecordsFlux(fx.AnyFlux):
             yield r
 
     def enumerate(self, native=False):
-        props = self.meta()
+        props = self.get_meta()
         if native:
             target_class = self.__class__
             enumerated = self.enumerated_records()
@@ -149,7 +149,7 @@ class RecordsFlux(fx.AnyFlux):
                 if not select_value(r, f):
                     return False
             return True
-        props = self.meta()
+        props = self.get_meta()
         props.pop('count')
         filtered_items = filter(filter_function, self.items)
         if self.is_in_memory():
@@ -254,7 +254,7 @@ class RecordsFlux(fx.AnyFlux):
     def schematize(self, schema, skip_bad_rows=False, skip_bad_values=False, verbose=True):
         return fx.SchemaFlux(
             self.items,
-            **self.meta()
+            **self.get_meta()
         ).schematize(
             schema=schema,
             skip_bad_rows=skip_bad_rows,

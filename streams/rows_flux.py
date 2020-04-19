@@ -55,7 +55,7 @@ class RowsFlux(fx.AnyFlux):
         )
         self.check = check
 
-    def meta(self):
+    def get_meta(self):
         return dict(
             count=self.count,
             check=self.check,
@@ -86,13 +86,13 @@ class RowsFlux(fx.AnyFlux):
             records = map(lambda r: dict(row=r), self.items)
         return fx.RecordsFlux(
             records,
-            **self.meta()
+            **self.get_meta()
         )
 
     def schematize(self, schema, skip_bad_rows=False, skip_bad_values=False, verbose=True):
         return fx.SchemaFlux(
             self.items,
-            **self.meta(),
+            **self.get_meta(),
         ).schematize(
             schema=schema,
             skip_bad_rows=skip_bad_rows,

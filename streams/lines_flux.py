@@ -43,7 +43,7 @@ class LinesFlux(fx.AnyFlux):
         self.check = check
         self.source = source
 
-    def meta(self):
+    def get_meta(self):
         return dict(
             count=self.count,
             check=self.check,

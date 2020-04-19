@@ -79,7 +79,7 @@ class SchemaFlux(fx.RowsFlux):
         )
         self.schema = schema or list()
 
-    def meta(self):
+    def get_meta(self):
         return dict(
             count=self.count(),
             check=self.check(),

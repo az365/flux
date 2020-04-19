@@ -39,7 +39,7 @@ class PairsFlux(fx.RowsFlux):
             assert secondary in fx.FluxType
             self.secondary = secondary or fx.FluxType.AnyFlux
 
-    def meta(self):
+    def get_meta(self):
         return dict(
             count=self.count,
             check=self.check,
@@ -132,7 +132,7 @@ class PairsFlux(fx.RowsFlux):
                 for key in dict_right:
                     if key not in keys_used:
                         yield key, dict_right[key]
-        props = self.meta()
+        props = self.get_meta()
         props.pop('count')
         return PairsFlux(
             list(get_items()) if self.is_in_memory() else get_items(),
