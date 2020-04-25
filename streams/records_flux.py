@@ -107,9 +107,11 @@ class RecordsFlux(fx.AnyFlux):
             lambda r: selection.get_fields(r, *descriptions),
         )
 
-    def filter(self, *fields):
+    def filter(self, *fields, **expressions):
+        extended_filters_list = list(fields) + list(expressions.items())
+
         def filter_function(r):
-            for f in fields:
+            for f in extended_filters_list:
                 if not selection.value_from_record(r, f):
                     return False
             return True
