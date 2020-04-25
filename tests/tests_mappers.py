@@ -57,7 +57,19 @@ def test_sum_by_keys():
     assert received == expected
 
 
+def test_get_first_values():
+    fields = ['a', 'b', 'c', 'd']
+    example = [{'a': 1, 'b': 2}, {'b': 3, 'c': 4}]
+    expected = {'a': 1, 'b': 2, 'c': 4}
+    received = ms.get_first_values(
+        example,
+        fields,
+    )
+    assert received == expected
+
+
 if __name__ == '__main__':
     test_calc_histogram()
     test_norm_text()
     test_sum_by_keys()
+    test_get_first_values()

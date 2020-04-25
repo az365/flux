@@ -76,16 +76,17 @@ def get_histograms(records, fields=tuple(), max_values=25, ignore_none=False):
 
 
 def norm_text(text):
-    text = str(text).lower().replace('\t', ' ')
-    text = text.replace('ё', 'е')
-    text = RE_LETTERS.sub('', text)
-    while '  ' in text:
-        text = text.replace('  ', ' ')
-    if text.startswith(' '):
-        text = text[1:]
-    if text.endswith(' '):
-        text = text[:-1]
-    return text
+    if text is not None:
+        text = str(text).lower().replace('\t', ' ')
+        text = text.replace('ё', 'е')
+        text = RE_LETTERS.sub('', text)
+        while '  ' in text:
+            text = text.replace('  ', ' ')
+        if text.startswith(' '):
+            text = text[1:]
+        if text.endswith(' '):
+            text = text[:-1]
+        return text
 
 
 def sum_by_keys(records, keys, counters):
@@ -97,3 +98,18 @@ def sum_by_keys(records, keys, counters):
         for c in counters:
             result[cur_key][c] = result[cur_key].get(c, 0) + r.get(c, 0)
     yield from result.items()
+
+
+def get_first_values(records, fields):
+    dict_first_values = dict()
+    empty_fields = fields.copy()
+    for r in records:
+        added_fields = list()
+        for f in empty_fields:
+            v = r.get(f)
+            if v:
+                dict_first_values[f] = v
+                added_fields.append(f)
+        for f in added_fields:
+            empty_fields.remove(f)
+    return dict_first_values
