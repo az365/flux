@@ -69,7 +69,10 @@ class LinesFlux(fx.AnyFlux):
     def valid_items(items, skip_errors=False):
         return check_lines(items, skip_errors)
 
-    def parse_json(self, default_value=None, to=fx.FluxType.RecordsFlux):
+    def parse_json(self, default_value=None, to='RecordsFlux'):
+        if isinstance(to, str):
+            to = fx.FluxType(to)
+
         def json_loads(line):
             try:
                 return json.loads(line)

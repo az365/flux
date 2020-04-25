@@ -37,6 +37,8 @@ class FluxType(Enum):
 
 
 def get_class(flux_type):
+    if isinstance(flux_type, str):
+        flux_type = FluxType(flux_type)
     assert isinstance(flux_type, FluxType), TypeError(
         'flux_type must be an instance of FluxType (but {} as type {} received)'.format(flux_type, type(flux_type))
     )
