@@ -79,8 +79,9 @@ class RowsFlux(fx.AnyFlux):
             verbose=verbose,
         )
 
+    @classmethod
     def from_csv_file(
-            self,
+            cls,
             filename,
             encoding=None, gz=False,
             delimiter='\t',
@@ -91,11 +92,11 @@ class RowsFlux(fx.AnyFlux):
             filename,
             encoding=encoding, gz=gz,
             skip_first_line=skip_first_line, max_n=max_n,
-            verbose=True,
+            verbose=verbose,
         ).to_rows(
             delimiter=delimiter
         )
-        return self.add_flux(fx_rows)
+        return fx_rows
 
     def to_lines(self, delimiter='\t'):
         return fx.LinesFlux(

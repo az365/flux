@@ -88,8 +88,9 @@ class LinesFlux(fx.AnyFlux):
             count=self.count,
         )
 
+    @classmethod
     def from_file(
-            self,
+            cls,
             filename,
             encoding=None, gz=False,
             skip_first_line=False, max_n=None,
@@ -101,17 +102,17 @@ class LinesFlux(fx.AnyFlux):
             skip_first_line=skip_first_line, max_n=max_n,
             verbose=verbose, step_n=step_n,
         )
-        is_inherited = fx_lines.flux_type() != self.flux_type()
+        is_inherited = fx_lines.flux_type() != cls.flux_type()
         if is_inherited:
-            fx_lines = fx_lines.map(function=fs.same(), to=self.flux_type())
-        return self.add_flux(fx_lines)
+            fx_lines = fx_lines.map(function=fs.same(), to=cls.flux_type())
+        return fx_lines
 
     def lazy_save(self, filename, encoding=None, end='\n', verbose=True, immediately=False):
         def write_and_yield(fh, lines):
             n = 0
             for n, i in enumerate(lines):
                 if n > 0:
-                    fileholder.write(end)
+                    fh.write(end)
                 fh.write(str(i))
                 yield i
             fh.close()
@@ -129,11 +130,15 @@ class LinesFlux(fx.AnyFlux):
     def to_file(self, filename, encoding=None, end='\n', verbose=True, return_flux=True):
         saved_flux = self.lazy_save(filename, encoding, end, verbose, immediately=False)
         saved_flux.pass_items()
+        meta = self.get_meta()
+        meta.pop('count')
         if return_flux:
             return readers.from_file(
                 filename,
                 encoding=encoding,
                 verbose=verbose,
+            ).update_meta(
+                **meta
             )
 
     def to_rows(self, delimiter=None):

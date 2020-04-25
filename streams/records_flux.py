@@ -241,6 +241,83 @@ class RecordsFlux(fx.AnyFlux):
             check=False,
         )
 
+    def to_csv_file(
+            self,
+            filename,
+            columns,
+            delimiter='\t',
+            add_title_row=True,
+            encoding=arg.DEFAULT,
+            verbose=True,
+            return_flux=True,
+    ):
+        encoding = arg.undefault(encoding, self.tmp_files_encoding)
+        meta = self.get_meta()
+        meta.pop('count')
+        fx_csv_file = self.to_rows(
+            columns=columns,
+            add_title_row=add_title_row,
+        ).to_lines(
+            delimiter=delimiter,
+        ).to_file(
+            filename,
+            encoding=encoding,
+            verbose=verbose,
+            return_flux=return_flux,
+        )
+        if return_flux:
+            return fx_csv_file.skip(
+                1 if add_title_row else 0,
+            ).to_rows(
+                delimiter=delimiter,
+            ).to_records(
+                columns=columns,
+            ).update_meta(
+                **meta
+            )
+
+    @classmethod
+    def from_csv_file(
+            cls,
+            filename,
+            columns,
+            delimiter='\t',
+            encoding=arg.DEFAULT,
+            skip_first_line=True,
+            verbose=True
+    ):
+        encoding = arg.undefault(encoding, fx.TMP_FILES_ENCODING)
+        return fx.LinesFlux.from_file(
+            filename,
+            encoding=encoding,
+            skip_first_line=skip_first_line,
+            verbose=verbose,
+        ).to_rows(
+            delimiter=delimiter,
+        ).to_records(
+            columns=columns,
+        )
+
+    @classmethod
+    def from_json_file(
+            cls,
+            filename,
+            encoding=None, gz=False,
+            default_value=None,
+            max_n=None,
+            verbose=False,
+    ):
+        parsed_flux = fx.LinesFlux.from_file(
+            filename,
+            encoding=encoding, gz=gz,
+            max_n=max_n,
+            verbose=verbose,
+        ).parse_json(
+            default_value=default_value,
+            to=fx.FluxType.RecordsFlux,
+        )
+        return parsed_flux
+
     def get_dict(self, key, value=None, of_lists=False):
         return self.to_pairs(
             key,
