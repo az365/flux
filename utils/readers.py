@@ -37,23 +37,16 @@ def from_file(
         filename,
         encoding=None, gz=False,
         skip_first_line=False, max_n=None,
+        rstrip='\n',
         verbose=False, step_n=VERBOSE_STEP,
 ):
-    def lines_from_fileholder(fh, count, verbose, step_n, rstrip='\n'):
+    def lines_from_fileholder(fh, count):
         for n, row in enumerate(fh):
-            if verbose:
-                if (n % step_n == 0) or (n + 1 >= count):
-                    percent = int(100 * (n + 1) / count)
-                    print('{}% ({}/{}) lines processed'.format(percent, n + 1, count), end='\r')
             if rstrip:
                 row = row.rstrip(rstrip)
             yield row
             if count and (n + 1 == count):
                 break
-        if verbose:
-            print(' ' * 80, end='\r')
-            print('Done. {} lines processed'.format(count))
-            print('')
         fh.close()
 
     if verbose:
@@ -70,10 +63,16 @@ def from_file(
         fileholder = open(filename, 'r', encoding=encoding) if encoding else open(filename, 'r')
 
     flux_from_file = fx.LinesFlux(
-        lines_from_fileholder(fileholder, lines_count, verbose, step_n),
+        lines_from_fileholder(fileholder, lines_count),
         lines_count,
         source=filename,
     )
+    if verbose:
+        flux_from_file = flux_from_file.progress(
+            count=lines_count,
+            step=step_n,
+            message='Reading {}'.format(filename.split('/')[-1]),
+        )
     if skip_first_line:
         flux_from_file = flux_from_file.skip(1)
     return flux_from_file

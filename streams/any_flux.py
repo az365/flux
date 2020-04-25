@@ -5,10 +5,19 @@ import json
 
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
-    from utils import arguments as arg
+    from utils import (
+        arguments as arg,
+        functions as fs,
+    )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
-    from ..utils import arguments as arg
+    from ..utils import (
+        arguments as arg,
+        functions as fs,
+    )
+
+
+VERBOSE_STEP = 1000
 
 
 def merge_iter(iterables, key_function, reverse=False):
@@ -101,8 +110,9 @@ class AnyFlux:
             raise TypeError('property name must be function, meta-field or attribute name')
         return value
 
+    @classmethod
     def from_json_file(
-            self,
+            cls,
             filename,
             encoding=None, gz=False,
             skip_first_line=False, max_n=None,
@@ -114,9 +124,9 @@ class AnyFlux:
             skip_first_line=skip_first_line, max_n=max_n,
             verbose=verbose,
         ).parse_json(
-            to=self.flux_type(),
+            to=cls.__name__,
         )
-        return self.add_flux(parsed_flux)
+        return parsed_flux
 
     @staticmethod
     def is_valid_item(item):
@@ -266,6 +276,26 @@ class AnyFlux:
         return target_class(
             items=self.enumerated_items(),
             **props
+        )
+
+    def progress(self, count=arg.DEFAULT, step=VERBOSE_STEP, message='Progress'):
+        count = arg.undefault(count, self.count)
+
+        def yield_items():
+            for n, item in self.enumerated_items():
+                if (n % step == 0) or (n + 1 > count):
+                    if count:
+                        percent = fs.percent(str)((n + 1) / count)
+                        print(' ' * 80, end='\r')
+                        print('{}: {} ({}/{}) lines processed'.format(message, percent, n + 1, count), end='\r')
+                    else:
+                        print('{}: {} lines processed'.format(message, n + 1), end='\r')
+                yield item
+            print(' ' * 80, end='\r')
+            print('{}: Done. {} lines processed'.format(message, count))
+        return self.__class__(
+            yield_items(),
+            **self.get_meta()
         )
 
     def take(self, max_count=1):
