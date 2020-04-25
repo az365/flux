@@ -1,9 +1,11 @@
-import gzip
+import gzip as gz
 
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
+    from utils import arguments as arg
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
+    from ..utils import arguments as arg
 
 
 VERBOSE_STEP = 10000
@@ -23,43 +25,47 @@ def from_list(input_list):
     )
 
 
-def count_lines(filename, encoding=None, gz=False, chunk_size=8192):
-    if gz:
-        fileholder = gzip.open(filename, 'r')
+def count_lines(filename, encoding=None, gzip=False, chunk_size=8192, end='\n'):
+    if gzip:
+        fileholder = gz.open(filename, 'r')
+        end = end.encode(encoding) if encoding else end.encode()
     else:
         fileholder = open(filename, 'r', encoding=encoding) if encoding else open(filename, 'r')
-    count_n = sum(chunk.count('\n') for chunk in iter(lambda: fileholder.read(chunk_size), ''))
+    count_n = sum(chunk.count(end) for chunk in iter(lambda: fileholder.read(chunk_size), ''))
     fileholder.close()
     return count_n + 1
 
 
 def from_file(
         filename,
-        encoding=None, gz=False,
+        encoding=None, gzip=False,
         skip_first_line=False, max_n=None,
-        rstrip='\n',
-        check=True, expected_n=-1,
+        end='\n',
+        check=arg.DEFAULT, expected_n=-1,
         verbose=False, step=VERBOSE_STEP,
 ):
     def lines_from_fileholder(fh, count):
         for n, row in enumerate(fh):
-            if rstrip:
-                row = row.rstrip(rstrip)
+            if isinstance(row, bytes):
+                row = row.decode(encoding) if encoding else row.decode()
+            if end:
+                row = row.rstrip(end)
             yield row
             if (count > 0) and (n + 1 == count):
                 break
         fh.close()
 
+    check = arg.undefault(check, False if gzip else True)
     if check:
         if verbose:
             print('Checking file:', filename, end='\r')
-        lines_count = count_lines(filename, encoding, gz)
+        lines_count = count_lines(filename, encoding, gzip)
     else:
         lines_count = max_n or expected_n
     if max_n and max_n < lines_count:
         lines_count = max_n
-    if gz:
-        fileholder = gzip.open(filename, 'r')
+    if gzip:
+        fileholder = gz.open(filename, 'r')
     else:
         fileholder = open(filename, 'r', encoding=encoding) if encoding else open(filename, 'r')
 

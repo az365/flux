@@ -177,8 +177,8 @@ def test_save_and_read():
     received_1 = readers.from_file(
         EXAMPLE_FILENAME
     ).get_list()
-    assert received_0 == expected, 'test case 0'
-    assert received_1 == expected, 'test case 1'
+    assert received_0 == expected, 'test case 0: lazy_save()'
+    assert received_1 == expected, 'test case 1: secondary fileholder'
     readers.from_list(
         EXAMPLE_INT_SEQUENCE,
     ).to_lines(
@@ -188,7 +188,24 @@ def test_save_and_read():
     received_2 = readers.from_file(
         EXAMPLE_FILENAME,
     ).get_list()
-    assert received_2 == expected, 'test case 2'
+    assert received_2 == expected, 'test case 2: to_file()'
+    readers.from_list(
+        EXAMPLE_INT_SEQUENCE,
+    ).to_rows(
+        function=lambda i: [i],
+    ).to_csv_file(
+        EXAMPLE_FILENAME,
+        gzip=True,
+    )
+    received_3 = fx.RowsFlux.from_csv_file(
+        EXAMPLE_FILENAME,
+        gzip=True,
+    ).select(
+        (str, 0),
+    ).map_to_any(
+        lambda r: r[0],
+    ).get_list()
+    assert received_3 == expected, 'test case 3: gzip'
 
 
 def test_add():

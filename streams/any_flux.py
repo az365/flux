@@ -114,14 +114,14 @@ class AnyFlux:
     def from_json_file(
             cls,
             filename,
-            encoding=None, gz=False,
+            encoding=None, gzip=False,
             skip_first_line=False, max_n=None,
-            check=True,
+            check=arg.DEFAULT,
             verbose=False,
     ):
         parsed_flux = fx.LinesFlux.from_file(
             filename,
-            encoding=encoding, gz=gz,
+            encoding=encoding, gzip=gzip,
             skip_first_line=skip_first_line, max_n=max_n,
             check=check,
             verbose=verbose,
@@ -600,7 +600,7 @@ class AnyFlux:
                 'to_rows(): positional arguments are not supported for class {}'.format(self.class_name())
             )
         return fx.RowsFlux(
-            function(self.items) if function is not None else self.items,
+            map(function, self.items) if function is not None else self.items,
             count=self.count,
         )
 

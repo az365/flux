@@ -250,13 +250,15 @@ class RecordsFlux(fx.AnyFlux):
             delimiter='\t',
             add_title_row=True,
             encoding=arg.DEFAULT,
+            gzip=False,
             check=True,
             verbose=True,
             return_flux=True,
     ):
         encoding = arg.undefault(encoding, self.tmp_files_encoding)
         meta = self.get_meta()
-        meta.pop('count')
+        if not gzip:
+            meta.pop('count')
         fx_csv_file = self.to_rows(
             columns=columns,
             add_title_row=add_title_row,
@@ -265,6 +267,7 @@ class RecordsFlux(fx.AnyFlux):
         ).to_file(
             filename,
             encoding=encoding,
+            gzip=gzip,
             check=check,
             verbose=verbose,
             return_flux=return_flux,
@@ -286,16 +289,18 @@ class RecordsFlux(fx.AnyFlux):
             filename,
             columns,
             delimiter='\t',
-            encoding=arg.DEFAULT,
             skip_first_line=True,
-            check=True,
+            encoding=arg.DEFAULT,
+            gzip=False,
+            check=arg.DEFAULT,
             verbose=True
     ):
         encoding = arg.undefault(encoding, fx.TMP_FILES_ENCODING)
         return fx.LinesFlux.from_file(
             filename,
-            encoding=encoding,
             skip_first_line=skip_first_line,
+            encoding=encoding,
+            gzip=gzip,
             check=check,
             verbose=verbose,
         ).to_rows(
@@ -308,7 +313,8 @@ class RecordsFlux(fx.AnyFlux):
     def from_json_file(
             cls,
             filename,
-            encoding=None, gz=False,
+            encoding=None,
+            gzip=False,
             default_value=None,
             max_n=None,
             check=True,
@@ -316,7 +322,8 @@ class RecordsFlux(fx.AnyFlux):
     ):
         parsed_flux = fx.LinesFlux.from_file(
             filename,
-            encoding=encoding, gz=gz,
+            encoding=encoding,
+            gzip=gzip,
             max_n=max_n,
             check=check,
             verbose=verbose,

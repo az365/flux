@@ -1,9 +1,15 @@
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
-    from utils import selection
+    from utils import (
+        arguments as arg,
+        selection,
+    )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
-    from ..utils import selection
+    from ..utils import (
+        arguments as arg,
+        selection,
+    )
 
 
 def is_row(row):
@@ -17,7 +23,7 @@ def check_rows(rows, skip_errors=False):
         elif skip_errors:
             continue
         else:
-            raise TypeError('check_records(): this item is not row: {}'.format(i))
+            raise TypeError('check_rows(): this item is not row: {}'.format(i))
         yield i
 
 
@@ -83,15 +89,15 @@ class RowsFlux(fx.AnyFlux):
     def from_csv_file(
             cls,
             filename,
-            encoding=None, gz=False,
+            encoding=None, gzip=False,
             delimiter='\t',
             skip_first_line=False, max_n=None,
-            check=True,
+            check=arg.DEFAULT,
             verbose=False,
     ):
         fx_rows = fx.LinesFlux.from_file(
             filename,
-            encoding=encoding, gz=gz,
+            encoding=encoding, gzip=gzip,
             skip_first_line=skip_first_line, max_n=max_n,
             check=check,
             verbose=verbose,
@@ -99,6 +105,37 @@ class RowsFlux(fx.AnyFlux):
             delimiter=delimiter
         )
         return fx_rows
+
+    def to_csv_file(
+            self,
+            filename,
+            delimiter='\t',
+            encoding=arg.DEFAULT,
+            gzip=False,
+            check=arg.DEFAULT,
+            verbose=True,
+            return_flux=True,
+    ):
+        encoding = arg.undefault(encoding, self.tmp_files_encoding)
+        meta = self.get_meta()
+        if not gzip:
+            meta.pop('count')
+        fx_csv_file = self.to_lines(
+            delimiter=delimiter,
+        ).to_file(
+            filename,
+            encoding=encoding,
+            gzip=gzip,
+            check=check,
+            verbose=verbose,
+            return_flux=return_flux,
+        )
+        if return_flux:
+            return fx_csv_file.to_rows(
+                delimiter=delimiter,
+            ).update_meta(
+                **meta
+            )
 
     def to_lines(self, delimiter='\t'):
         return fx.LinesFlux(

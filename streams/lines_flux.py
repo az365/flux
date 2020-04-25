@@ -1,18 +1,21 @@
 import sys
 import json
 import csv
+import gzip as gz
 
 
 try:
     import fluxes as fx
     from utils import (
         functions as fs,
+        arguments as arg,
         readers
     )
 except ImportError:
     from .. import fluxes as fx
     from ..utils import (
         functions as fs,
+        arguments as arg,
         readers
     )
 
@@ -92,14 +95,14 @@ class LinesFlux(fx.AnyFlux):
     def from_file(
             cls,
             filename,
-            encoding=None, gz=False,
+            encoding=None, gzip=False,
             skip_first_line=False, max_n=None,
-            check=True,
+            check=arg.DEFAULT,
             verbose=False, step=readers.VERBOSE_STEP,
     ):
         fx_lines = readers.from_file(
             filename,
-            encoding=encoding, gz=gz,
+            encoding=encoding, gzip=gzip,
             skip_first_line=skip_first_line, max_n=max_n,
             check=check,
             verbose=verbose, step=step,
@@ -109,28 +112,57 @@ class LinesFlux(fx.AnyFlux):
             fx_lines = fx_lines.map(function=fs.same(), to=cls.__name__)
         return fx_lines
 
-    def lazy_save(self, filename, encoding=None, end='\n', verbose=True, immediately=False):
+    def lazy_save(
+            self,
+            filename,
+            encoding=None, gzip=False,
+            end='\n', check=arg.DEFAULT,
+            verbose=True, immediately=False,
+    ):
         def write_and_yield(fh, lines):
             n = 0
             for n, i in enumerate(lines):
                 if n > 0:
-                    fh.write(end)
-                fh.write(str(i))
+                    fh.write(end.encode(encoding) if gzip else end)
+                fh.write(str(i).encode(encoding) if gzip else str(i))
                 yield i
             fh.close()
             if verbose:
                 print('Done. {} rows has written into {}'.format(n + 1, filename))
         if immediately:
-            self.to_file(filename, encoding, end, verbose, return_flux=True)
+            self.to_file(
+                filename,
+                encoding=encoding,
+                end=end,
+                check=check,
+                verbose=verbose,
+                return_flux=True,
+            )
         else:
-            fileholder = open(filename, 'w', encoding=encoding) if encoding else open(filename, 'w')
+            if gzip:
+                fileholder = gz.open(filename, 'w')
+            else:
+                fileholder = open(filename, 'w', encoding=encoding) if encoding else open(filename, 'w')
             return LinesFlux(
                 write_and_yield(fileholder, self.items),
-                count=self.count,
+                **self.get_meta()
             )
 
-    def to_file(self, filename, encoding=None, end='\n', check=True, verbose=True, return_flux=True):
-        saved_flux = self.lazy_save(filename, encoding, end, verbose, immediately=False)
+    def to_file(
+            self,
+            filename,
+            encoding=None, gzip=False,
+            end='\n', check=arg.DEFAULT,
+            verbose=True, return_flux=True
+    ):
+        saved_flux = self.lazy_save(
+            filename,
+            encoding=encoding,
+            gzip=gzip,
+            end=end,
+            verbose=verbose,
+            immediately=False,
+        )
         saved_flux.pass_items()
         meta = self.get_meta()
         meta.pop('count')
@@ -138,6 +170,7 @@ class LinesFlux(fx.AnyFlux):
             return readers.from_file(
                 filename,
                 encoding=encoding,
+                gzip=gzip,
                 check=check,
                 verbose=verbose,
             ).update_meta(
