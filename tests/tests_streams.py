@@ -1,8 +1,5 @@
 import fluxes as fx
-from utils import (
-    mappers as ms,
-    readers,
-)
+from utils import readers
 
 
 EXAMPLE_FILENAME = 'test_file.tmp'
@@ -11,12 +8,6 @@ EXAMPLE_CSV_ROWS = [
     'a,1',
     'b,"2,22"',
     'c,3',
-]
-EXAMPLE_TSV_ROWS = [
-    '1\t2\t3',
-    '1\t4\t5',
-    '1\t6\t7',
-    '9\t4\t9',
 ]
 
 
@@ -440,55 +431,6 @@ def test_group_by():
     assert received_1 == expected, 'test case 1'
 
 
-def test_calc_histogram():
-    expected = [
-        ('x', {1: 3, 9: 1}),
-        ('y', {2: 1, 4: 2, 6: 1})
-    ]
-    received = readers.from_list(
-        EXAMPLE_TSV_ROWS,
-    ).to_lines().to_rows(
-        '\t',
-    ).to_records(
-        columns=('x', 'y', 'z'),
-    ).select(
-        '*',
-        x=('x', int),
-        y=('y', int),
-        z=('z', int),
-    ).apply(
-        lambda a: ms.get_histograms(a, fields=['x', 'y']),
-        native=False,
-    ).get_list()
-    assert received == expected
-
-
-def test_norm_text():
-    expected = 'абв gb'
-    received = ms.norm_text(
-        '\t Абв 123 Gb\n'
-    )
-    assert received == expected
-
-
-def test_sum_by_keys():
-    expected = [((2, 1), {'h': 3}), ((4, 3), {'h': 5})]
-    received = readers.from_list(
-        [
-            {'a': 1, 'b': 2, 'h': 1},
-            {'a': 3, 'b': 4, 'h': 5},
-            {'a': 1, 'b': 2, 'h': 2},
-        ],
-    ).apply(
-        lambda a: ms.sum_by_keys(
-            a,
-            keys=('b', 'a'),
-            counters=('h', ),
-        ),
-    ).get_list()
-    assert received == expected
-
-
 def test_to_rows():
     expected = [['a', '1'], ['b', '2,22'], ['c', '3']]
     received = readers.from_list(
@@ -532,8 +474,5 @@ if __name__ == '__main__':
     test_sort()
     test_sorted_group_by_key()
     test_group_by()
-    test_calc_histogram()
-    test_norm_text()
-    test_sum_by_keys()
     test_to_rows()
     test_parse_json()
