@@ -14,12 +14,38 @@ def partial(function, *args, **kwargs):
     return new_func
 
 
+def same():
+    def func(item):
+        return item
+    return func
+
+
+def const(value):
+    def func(_):
+        return value
+    return func
+
+
 def cast(field_type, default_int=0):
     def func(value):
-        cast_function = DICT_CAST_TYPES[field_type]
+        cast_function = DICT_CAST_TYPES.get(field_type, field_type)
         if value in (None, 'None', '') and field_type in ('int', int):
             value = default_int
         return cast_function(value)
+    return func
+
+
+def percent(field_type=float, round_digits=1, default_value=None):
+    def func(value):
+        if value is None:
+            return default_value
+        else:
+            cast_function = DICT_CAST_TYPES.get(field_type, field_type)
+            value = round(100 * value, round_digits)
+            value = cast_function(value)
+            if cast_function == str:
+                value += '%'
+            return value
     return func
 
 
@@ -35,9 +61,15 @@ def nonzero(zero_values=ZERO_VALUES):
     return func
 
 
-def equals(other):
+def equal(other):
     def func(value):
         return value == other
+    return func
+
+
+def not_equal(other):
+    def func(value):
+        return value != other
     return func
 
 
@@ -47,6 +79,27 @@ def is_in(list_values):
     def func(value):
         return value in list_values
     return func
+
+
+def is_in_sample(sample_rate, sample_bucket=1, as_str=True, hash_func=hash):
+    def func(elem_id):
+        if as_str:
+            elem_id = str(elem_id)
+        return hash_func(elem_id) % sample_rate == sample_bucket
+    return func
+
+
+def more_than(number, including=False):
+    def func(value):
+        if including:
+            return value >= number
+        else:
+            return value > number
+    return func
+
+
+def at_least(number):
+    return more_than(number, including=True)
 
 
 def maybe(*conditions):
@@ -68,4 +121,19 @@ def never(*conditions):
             if c(value):
                 return False
         return True
+    return func
+
+
+def apply_dict(dictionary, default=None):
+    def func(key):
+        return dictionary.get(key, default)
+    return func
+
+
+def elem_no(position, defatult=None):
+    def func(array):
+        if len(array) > position:
+            return array[position]
+        else:
+            return defatult
     return func
