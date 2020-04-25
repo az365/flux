@@ -38,25 +38,26 @@ def from_file(
         encoding=None, gz=False,
         skip_first_line=False, max_n=None,
         rstrip='\n',
-        verbose=False, step_n=VERBOSE_STEP,
+        check=True, expected_n=-1,
+        verbose=False, step=VERBOSE_STEP,
 ):
     def lines_from_fileholder(fh, count):
         for n, row in enumerate(fh):
             if rstrip:
                 row = row.rstrip(rstrip)
             yield row
-            if count and (n + 1 == count):
+            if (count > 0) and (n + 1 == count):
                 break
         fh.close()
 
-    if verbose:
-        print('Checking', filename, end='\r')
-    lines_count = count_lines(filename, encoding, gz)
+    if check:
+        if verbose:
+            print('Checking file:', filename, end='\r')
+        lines_count = count_lines(filename, encoding, gz)
+    else:
+        lines_count = max_n or expected_n
     if max_n and max_n < lines_count:
         lines_count = max_n
-    if verbose:
-        print(' ' * 80, end='\r')
-        print(verbose if isinstance(verbose, str) else 'Reading file:', filename)
     if gz:
         fileholder = gzip.open(filename, 'r')
     else:
@@ -68,10 +69,11 @@ def from_file(
         source=filename,
     )
     if verbose:
+        message = verbose if isinstance(verbose, str) else 'Reading {}'.format(filename.split('/')[-1])
         flux_from_file = flux_from_file.progress(
             count=lines_count,
-            step=step_n,
-            message='Reading {}'.format(filename.split('/')[-1]),
+            step=step,
+            message=message,
         )
     if skip_first_line:
         flux_from_file = flux_from_file.skip(1)

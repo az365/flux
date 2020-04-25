@@ -86,12 +86,14 @@ class RowsFlux(fx.AnyFlux):
             encoding=None, gz=False,
             delimiter='\t',
             skip_first_line=False, max_n=None,
+            check=True,
             verbose=False,
     ):
-        fx_rows = fx.LinesFlux().from_file(
+        fx_rows = fx.LinesFlux.from_file(
             filename,
             encoding=encoding, gz=gz,
             skip_first_line=skip_first_line, max_n=max_n,
+            check=check,
             verbose=verbose,
         ).to_rows(
             delimiter=delimiter

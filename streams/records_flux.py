@@ -250,6 +250,7 @@ class RecordsFlux(fx.AnyFlux):
             delimiter='\t',
             add_title_row=True,
             encoding=arg.DEFAULT,
+            check=True,
             verbose=True,
             return_flux=True,
     ):
@@ -264,6 +265,7 @@ class RecordsFlux(fx.AnyFlux):
         ).to_file(
             filename,
             encoding=encoding,
+            check=check,
             verbose=verbose,
             return_flux=return_flux,
         )
@@ -286,6 +288,7 @@ class RecordsFlux(fx.AnyFlux):
             delimiter='\t',
             encoding=arg.DEFAULT,
             skip_first_line=True,
+            check=True,
             verbose=True
     ):
         encoding = arg.undefault(encoding, fx.TMP_FILES_ENCODING)
@@ -293,6 +296,7 @@ class RecordsFlux(fx.AnyFlux):
             filename,
             encoding=encoding,
             skip_first_line=skip_first_line,
+            check=check,
             verbose=verbose,
         ).to_rows(
             delimiter=delimiter,
@@ -307,12 +311,14 @@ class RecordsFlux(fx.AnyFlux):
             encoding=None, gz=False,
             default_value=None,
             max_n=None,
+            check=True,
             verbose=False,
     ):
         parsed_flux = fx.LinesFlux.from_file(
             filename,
             encoding=encoding, gz=gz,
             max_n=max_n,
+            check=check,
             verbose=verbose,
         ).parse_json(
             default_value=default_value,

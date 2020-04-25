@@ -116,12 +116,14 @@ class AnyFlux:
             filename,
             encoding=None, gz=False,
             skip_first_line=False, max_n=None,
+            check=True,
             verbose=False,
     ):
         parsed_flux = fx.LinesFlux.from_file(
             filename,
             encoding=encoding, gz=gz,
             skip_first_line=skip_first_line, max_n=max_n,
+            check=check,
             verbose=verbose,
         ).parse_json(
             to=cls.__name__,
