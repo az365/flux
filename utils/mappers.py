@@ -75,17 +75,24 @@ def get_histograms(records, fields=tuple(), max_values=25, ignore_none=False):
         yield k, v
 
 
+def remove_extra_spaces(text):
+    if '\n' in text:
+        text = text.replace('\n', ' ')
+    while '  ' in text:
+        text = text.replace('  ', ' ')
+    if text.startswith(' '):
+        text = text[1:]
+    if text.endswith(' '):
+        text = text[:-1]
+    return text
+
+
 def norm_text(text):
     if text is not None:
         text = str(text).lower().replace('\t', ' ')
         text = text.replace('ё', 'е')
         text = RE_LETTERS.sub('', text)
-        while '  ' in text:
-            text = text.replace('  ', ' ')
-        if text.startswith(' '):
-            text = text[1:]
-        if text.endswith(' '):
-            text = text[:-1]
+        text = remove_extra_spaces(text)
         return text
 
 
