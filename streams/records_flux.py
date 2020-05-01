@@ -47,7 +47,7 @@ def get_key_function(descriptions, take_hash=False):
 class RecordsFlux(fx.AnyFlux):
     def __init__(
             self,
-            items,
+            data,
             count=None,
             check=True,
             max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
@@ -56,7 +56,7 @@ class RecordsFlux(fx.AnyFlux):
             context=None,
     ):
         super().__init__(
-            items=check_records(items) if check else items,
+            check_records(data) if check else data,
             count=count,
             max_items_in_memory=max_items_in_memory,
             tmp_files_template=tmp_files_template,
@@ -75,12 +75,12 @@ class RecordsFlux(fx.AnyFlux):
 
     def get_records(self, skip_errors=False, raise_errors=True):
         if skip_errors or raise_errors:
-            return check_records(self.items, skip_errors)
+            return check_records(self.data, skip_errors)
         else:
-            return self.items
+            return self.data
 
     def enumerated_records(self, field='#', first=1):
-        for n, r in enumerate(self.items):
+        for n, r in enumerate(self.data):
             r[field] = n + first
             yield r
 
@@ -94,7 +94,7 @@ class RecordsFlux(fx.AnyFlux):
             enumerated = self.enumerated_items()
             props['secondary'] = fx.FluxType(self.class_name())
         return target_class(
-            items=enumerated,
+            enumerated,
             **props
         )
 
@@ -119,7 +119,7 @@ class RecordsFlux(fx.AnyFlux):
             return True
         props = self.get_meta()
         props.pop('count')
-        filtered_items = filter(filter_function, self.items)
+        filtered_items = filter(filter_function, self.get_items())
         if self.is_in_memory():
             filtered_items = list(filtered_items)
             props['count'] = len(filtered_items)
@@ -149,7 +149,7 @@ class RecordsFlux(fx.AnyFlux):
             key_function = get_key_function(keys)
             accumulated = list()
             prev_k = None
-            for r in self.items:
+            for r in self.get_items():
                 k = key_function(r)
                 if (k != prev_k) and accumulated:
                     yield (prev_k, accumulated) if as_pairs else accumulated
@@ -188,7 +188,7 @@ class RecordsFlux(fx.AnyFlux):
         return grouped_fx
 
     def get_dataframe(self, columns=None):
-        dataframe = pd.DataFrame(self.items)
+        dataframe = pd.DataFrame(self.data)
         if columns:
             dataframe = dataframe[columns]
         return dataframe
@@ -210,7 +210,7 @@ class RecordsFlux(fx.AnyFlux):
         def get_rows(columns_list):
             if add_title_row:
                 yield columns_list
-            for r in self.items:
+            for r in self.get_items():
                 yield [r.get(f) for f in columns_list]
         if self.count is None:
             count = None
@@ -223,7 +223,7 @@ class RecordsFlux(fx.AnyFlux):
 
     def schematize(self, schema, skip_bad_rows=False, skip_bad_values=False, verbose=True):
         return fx.SchemaFlux(
-            self.items,
+            self.get_items(),
             **self.get_meta()
         ).schematize(
             schema=schema,
@@ -234,7 +234,7 @@ class RecordsFlux(fx.AnyFlux):
 
     def to_pairs(self, key, value=None):
         def get_pairs():
-            for i in self.items:
+            for i in self.get_items():
                 k = selection.value_from_record(i, key)
                 v = i if value is None else selection.value_from_record(i, value)
                 yield k, v

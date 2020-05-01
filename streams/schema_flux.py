@@ -67,7 +67,7 @@ def apply_schema_to_row(row, schema, skip_bad_values=False, verbose=True):
 class SchemaFlux(fx.RowsFlux):
     def __init__(
             self,
-            items,
+            data,
             count=None,
             check=True,
             schema=None,
@@ -77,7 +77,7 @@ class SchemaFlux(fx.RowsFlux):
             context=None,
     ):
         super().__init__(
-            items=check_rows(items, schema) if check else items,
+            check_rows(data, schema) if check else data,
             count=count,
             check=check,
             max_items_in_memory=max_items_in_memory,
@@ -102,7 +102,7 @@ class SchemaFlux(fx.RowsFlux):
 
     def set_schema(self, schema, check=True):
         return SchemaFlux(
-            items=check_rows(self.items, schema=schema) if check else self.items,
+            check_rows(self.data, schema=schema) if check else self.data,
             count=self.count,
             schema=schema,
         )
@@ -119,7 +119,7 @@ class SchemaFlux(fx.RowsFlux):
                 else:
                     yield apply_schema_to_row(r, schema, skip_bad_values=skip_bad_values, verbose=verbose)
         return SchemaFlux(
-            apply_schema_to_rows(self.items),
+            apply_schema_to_rows(self.data),
             count=None if skip_bad_rows else self.count,
             check=False,
             schema=schema,

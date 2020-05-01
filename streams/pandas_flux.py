@@ -15,7 +15,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
 class PandasFlux(fx.RecordsFlux):
     def __init__(
         self,
-        dataframe_or_series,
+        data,
         count=None,
         check=False,
         max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
@@ -23,14 +23,14 @@ class PandasFlux(fx.RecordsFlux):
         tmp_files_encoding=fx.TMP_FILES_ENCODING,
         context=None,
     ):
-        if isinstance(dataframe_or_series, pd.DataFrame):
-            dataframe = dataframe_or_series
-        elif isinstance(dataframe_or_series, fx.RecordsFlux):
-            dataframe = dataframe_or_series.get_dataframe()
-        else:  # isinstance(dataframe_or_series, (list, tuple)):
-            dataframe = pd.DataFrame(data=dataframe_or_series)
+        if isinstance(data, pd.DataFrame):
+            dataframe = data
+        elif isinstance(data, fx.RecordsFlux):
+            dataframe = data.get_dataframe()
+        else:  # isinstance(data, (list, tuple)):
+            dataframe = pd.DataFrame(data=data)
         super().__init__(
-            items=dataframe,
+            dataframe,
             count=count or dataframe.shape[1],
             check=check,
             max_items_in_memory=max_items_in_memory,
@@ -47,10 +47,10 @@ class PandasFlux(fx.RecordsFlux):
                 yield i
 
     def expected_count(self):
-        return self.items.shape[1]
+        return self.data.shape[1]
 
     def final_count(self):
-        return self.items.shape[1]
+        return self.data.shape[1]
 
     def get_records(self, **kwargs):
         for series in self.iterable(as_series=True):
@@ -58,15 +58,15 @@ class PandasFlux(fx.RecordsFlux):
 
     def get_dataframe(self, columns=None):
         if columns:
-            return self.items[columns]
+            return self.data[columns]
         else:
-            return self.items
+            return self.data
 
     def add_dataframe(self, dataframe, before=False):
         if before:
-            frames = [dataframe, self.items]
+            frames = [dataframe, self.data]
         else:
-            frames = [self.items, dataframe]
+            frames = [self.data, dataframe]
         concatenated = pd.concat(frames)
         return PandasFlux(concatenated)
 
@@ -76,9 +76,9 @@ class PandasFlux(fx.RecordsFlux):
 
     def add_flux(self, flux, before=False):
         if isinstance(flux, PandasFlux):
-            return self.add_dataframe(flux.items, before)
+            return self.add_dataframe(flux.data, before)
         else:
-            return self.add_items(flux.items, before)
+            return self.add_items(flux.get_items(), before)
 
     def add(self, dataframe_or_flux_or_items, before=False, **kwargs):
         assert not kwargs

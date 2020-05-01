@@ -30,7 +30,7 @@ def check_rows(rows, skip_errors=False):
 class RowsFlux(fx.AnyFlux):
     def __init__(
             self,
-            items,
+            data,
             count=None,
             check=True,
             max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
@@ -39,7 +39,7 @@ class RowsFlux(fx.AnyFlux):
             context=None,
     ):
         super().__init__(
-            items=check_rows(items) if check else items,
+            check_rows(data) if check else data,
             count=count,
             max_items_in_memory=max_items_in_memory,
             tmp_files_template=tmp_files_template,
@@ -61,16 +61,16 @@ class RowsFlux(fx.AnyFlux):
             lambda r: selection.get_columns(r, *columns),
         )
 
-    def to_records(self, function=None, columns=[]):
+    def to_records(self, function=None, columns=tuple()):
         def get_records(rows, cols):
             for r in rows:
                 yield {k: v for k, v in zip(cols, r)}
         if function:
-            records = map(function, self.items)
+            records = map(function, self.get_items())
         elif columns:
-            records = get_records(self.items, columns)
+            records = get_records(self.get_items(), columns)
         else:
-            records = map(lambda r: dict(row=r), self.items)
+            records = map(lambda r: dict(row=r), self.get_items())
         return fx.RecordsFlux(
             records,
             **self.get_meta()
@@ -78,7 +78,7 @@ class RowsFlux(fx.AnyFlux):
 
     def schematize(self, schema, skip_bad_rows=False, skip_bad_values=False, verbose=True):
         return fx.SchemaFlux(
-            self.items,
+            self.get_items(),
             **self.get_meta(),
         ).schematize(
             schema=schema,
@@ -141,6 +141,6 @@ class RowsFlux(fx.AnyFlux):
 
     def to_lines(self, delimiter='\t'):
         return fx.LinesFlux(
-            map(lambda r: '\t'.join([str(c) for c in r]), self.items),
+            map(lambda r: '\t'.join([str(c) for c in r]), self.get_items()),
             count=self.count,
         )

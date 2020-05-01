@@ -46,7 +46,7 @@ def check_lines(lines, skip_errors=False):
 class LinesFlux(fx.AnyFlux):
     def __init__(
             self,
-            items,
+            data,
             count=None,
             check=True,
             source=None,
@@ -56,7 +56,7 @@ class LinesFlux(fx.AnyFlux):
             context=None,
     ):
         super().__init__(
-            check_lines(items) if check else items,
+            check_lines(data) if check else data,
             count=count,
             max_items_in_memory=max_items_in_memory,
             tmp_files_template=tmp_files_template,
@@ -146,7 +146,7 @@ class LinesFlux(fx.AnyFlux):
             else:
                 fileholder = open(filename, 'w', encoding=encoding) if encoding else open(filename, 'w')
             return LinesFlux(
-                write_and_yield(fileholder, self.items),
+                write_and_yield(fileholder, self.get_items()),
                 **self.get_meta()
             )
 
@@ -180,7 +180,7 @@ class LinesFlux(fx.AnyFlux):
             )
 
     def to_rows(self, delimiter=None):
-        lines = self.items
+        lines = self.get_items()
         rows = csv.reader(lines, delimiter=delimiter) if delimiter else csv.reader(lines)
         return fx.RowsFlux(
             rows,
@@ -188,7 +188,7 @@ class LinesFlux(fx.AnyFlux):
         )
 
     def to_pairs(self, delimiter=None):
-        lines = self.items
+        lines = self.get_items()
         rows = csv.reader(lines, delimiter=delimiter) if delimiter else csv.reader(lines)
         return fx.RowsFlux(
             rows,

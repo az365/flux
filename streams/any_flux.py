@@ -47,14 +47,14 @@ def merge_iter(iterables, key_function, reverse=False):
 class AnyFlux:
     def __init__(
             self,
-            items,
+            data,
             count=None,
             max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
             tmp_files_template=fx.TMP_FILES_TEMPLATE,
             tmp_files_encoding=fx.TMP_FILES_ENCODING,
             context=None,
     ):
-        self.items = items
+        self.data = data
         self.count = count
         self.max_items_in_memory = max_items_in_memory
         self.tmp_files_template = tmp_files_template
@@ -64,14 +64,17 @@ class AnyFlux:
     def get_context(self):
         return self.context
 
+    def get_items(self):
+        return self.data
+
     def get_meta(self):
         meta = self.__dict__.copy()
-        meta.pop('items')
+        meta.pop('data')
         return meta
 
     def set_meta(self, **meta):
         return self.__class__(
-            self.items,
+            self.data,
             **meta
         )
 
@@ -79,7 +82,7 @@ class AnyFlux:
         props = self.get_meta()
         props.update(meta)
         return self.__class__(
-            self.items,
+            self.data,
             **props
         )
 
@@ -97,7 +100,7 @@ class AnyFlux:
         elif inspect.isclass(other):
             return other
         else:
-            raise TypeError('to parameter must be class or FluxType (got {})'.format(type(to)))
+            raise TypeError('"other" parameter must be class or FluxType (got {})'.format(type(other)))
 
     def get_property(self, name, *args, **kwargs):
         if callable(name):
@@ -145,13 +148,12 @@ class AnyFlux:
 
     def validated(self, skip_errors=False):
         return self.__class__(
-            self.valid_items(self.items, skip_errors=skip_errors),
+            self.valid_items(self.get_items(), skip_errors=skip_errors),
             **self.get_meta()
         )
 
     def iterable(self):
-        for i in self.items:
-            yield i
+        yield from self.get_items()
 
     def next(self):
         return next(
@@ -159,7 +161,7 @@ class AnyFlux:
         )
 
     def one(self):
-        for i in self.items:
+        for i in self.get_items():
             return i
 
     def expected_count(self):
@@ -167,7 +169,7 @@ class AnyFlux:
 
     def final_count(self):
         result = 0
-        for _ in self.items:
+        for _ in self.get_items():
             result += 1
         return result
 
@@ -177,15 +179,18 @@ class AnyFlux:
                 i,
                 count=self.count,
             ) for i in tee(
-                self.items,
+                self.get_items(),
                 n,
             )
         ]
 
     def copy(self):
-        self.items, copy_items = tee(self.items, 2)
+        if self.is_in_memory():
+            copy_data = self.data.copy()
+        else:
+            self.data, copy_data = tee(self.iterable(), 2)
         return self.__class__(
-            copy_items,
+            copy_data,
             **self.get_meta()
         )
 
@@ -199,19 +204,19 @@ class AnyFlux:
             target_class = AnyFlux
             props = dict(count=self.count) if save_count else dict()
         return target_class(
-            function(self.items),
+            function(self.data),
             **props
         )
 
     def native_map(self, function):
         return self.__class__(
-            map(function, self.items),
+            map(function, self.get_items()),
             self.count,
         )
 
     def map_to_any(self, function):
         return AnyFlux(
-            map(function, self.items),
+            map(function, self.get_items()),
             self.count,
         )
 
@@ -222,7 +227,7 @@ class AnyFlux:
             else:
                 return function(i)
         return fx.RecordsFlux(
-            map(get_record, self.items),
+            map(get_record, self.get_items()),
             count=self.count,
             check=True,
         )
@@ -270,7 +275,7 @@ class AnyFlux:
         )
 
     def enumerated_items(self):
-        for n, i in enumerate(self.iterable()):
+        for n, i in enumerate(self.get_items()):
             yield n, i
 
     def enumerate(self, native=False):
@@ -281,7 +286,7 @@ class AnyFlux:
             target_class = fx.PairsFlux
             props['secondary'] = fx.FluxType(self.class_name())
         return target_class(
-            items=self.enumerated_items(),
+            self.enumerated_items(),
             **props
         )
 
@@ -323,7 +328,7 @@ class AnyFlux:
             for n, i in self.enumerated_items():
                 if n >= c:
                     yield i
-        next_items = self.items[count:] if self.is_in_memory() else skip_items(count)
+        next_items = self.get_items()[count:] if self.is_in_memory() else skip_items(count)
         props = self.get_meta()
         props['count'] = self.count - count if self.count else None
         return self.__class__(
@@ -332,7 +337,7 @@ class AnyFlux:
         )
 
     def pass_items(self):
-        for _ in self.items:
+        for _ in self.get_items():
             pass
 
     def add(self, flux_or_items, before=False, **kwargs):
@@ -369,7 +374,7 @@ class AnyFlux:
         else:
             total_count = None
         return self.add_items(
-            flux.items,
+            flux.get_items(),
             before=before,
         ).update_meta(
             count=total_count,
@@ -516,7 +521,7 @@ class AnyFlux:
 
     def memory_sort(self, key=lambda i: i, reverse=False):
         sorted_items = sorted(
-            self.to_memory().items,
+            self.to_memory().get_items(),
             key=key,
             reverse=reverse,
         )
@@ -560,10 +565,10 @@ class AnyFlux:
             return self.disk_sort(key, reverse, step, verbose)
 
     def get_list(self):
-        return list(self.items)
+        return list(self.get_items())
 
     def is_in_memory(self):
-        return isinstance(self.items, list)
+        return isinstance(self.data, list)
 
     def to_memory(self):
         items_as_list_in_memory = self.get_list()
@@ -578,13 +583,13 @@ class AnyFlux:
 
     def to_any(self):
         return fx.AnyFlux(
-            self.items,
+            self.get_items(),
             count=self.count,
         )
 
     def to_lines(self, **kwargs):
         return fx.LinesFlux(
-            self.map_to_any(str).items,
+            self.map_to_any(str).get_items(),
             count=self.count,
             check=True,
         )
@@ -605,13 +610,13 @@ class AnyFlux:
                 'to_rows(): positional arguments are not supported for class {}'.format(self.class_name())
             )
         return fx.RowsFlux(
-            map(function, self.items) if function is not None else self.items,
+            map(function, self.get_items()) if function is not None else self.get_items(),
             count=self.count,
         )
 
     def to_pairs(self, **kwargs):
         return fx.PairsFlux(
-            self.items,
+            self.get_items(),
             count=self.count,
         )
 
@@ -622,7 +627,7 @@ class AnyFlux:
     def show(self, count=3):
         print(self.class_name(), self.get_meta(), '\n')
         if self.is_in_memory():
-            for i in self.items[:count]:
+            for i in self.get_items()[:count]:
                 print(i)
         else:
             print(self.one())

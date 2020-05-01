@@ -35,7 +35,7 @@ def get_key(pair):
 class PairsFlux(fx.RowsFlux):
     def __init__(
             self,
-            items,
+            data,
             count=None,
             check=True,
             secondary=None,
@@ -45,7 +45,7 @@ class PairsFlux(fx.RowsFlux):
             context=None,
     ):
         super().__init__(
-            items=check_pairs(items) if check else items,
+            check_pairs(data) if check else data,
             count=count,
             check=check,
             max_items_in_memory=max_items_in_memory,
@@ -75,7 +75,7 @@ class PairsFlux(fx.RowsFlux):
 
     def secondary_flux(self):
         def get_values():
-            for i in self.items:
+            for i in self.data:
                 yield i[1]
         return fx.get_class(self.secondary)(
             list(get_values()) if self.is_in_memory() else get_values(),
@@ -100,7 +100,7 @@ class PairsFlux(fx.RowsFlux):
         def get_groups():
             accumulated = list()
             prev_k = None
-            for k, v in self.items:
+            for k, v in self.data:
                 if (k != prev_k) and accumulated:
                     yield prev_k, accumulated
                     accumulated = list()
@@ -125,7 +125,7 @@ class PairsFlux(fx.RowsFlux):
 
         def get_items():
             keys_used = set()
-            for key, value in self.items:
+            for key, value in self.data:
                 right_part = dict_right.get(key)
                 if how == 'outer':
                     keys_used.add(key)
@@ -152,7 +152,7 @@ class PairsFlux(fx.RowsFlux):
 
     def keys(self):
         my_keys = list()
-        for i in self.items:
+        for i in self.get_items():
             key = get_key(i)
             if key in my_keys:
                 pass
@@ -189,12 +189,12 @@ class PairsFlux(fx.RowsFlux):
     def get_dict(self, of_lists=False):
         result = dict()
         if of_lists:
-            for k, v in self.items:
+            for k, v in self.get_items():
                 distinct = result.get(k, [])
                 if v not in distinct:
                     result[k] = distinct + [v]
         else:
-            for k, v in self.items:
+            for k, v in self.get_items():
                 result[k] = v
         return result
 
