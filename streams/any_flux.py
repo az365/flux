@@ -8,12 +8,14 @@ try:  # Assume we're a sub-module in a package.
     from utils import (
         arguments as arg,
         functions as fs,
+        log_progress as log,
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
     from ..utils import (
         arguments as arg,
         functions as fs,
+        log_progress as log,
     )
 
 
@@ -63,6 +65,12 @@ class AnyFlux:
 
     def get_context(self):
         return self.context
+
+    def get_logger(self):
+        if self.context is not None:
+            return self.context.get_logger()
+        else:
+            return log.get_logger()
 
     def get_items(self):
         return self.data
@@ -133,6 +141,13 @@ class AnyFlux:
         else:
             raise TypeError('property name must be function, meta-field or attribute name')
         return value
+
+    def log(self, msg, level=arg.DEFAULT, end=arg.DEFAULT, verbose=True):
+        log.log(
+            logger=self.get_logger(),
+            msg=msg, level=level,
+            end=end, verbose=verbose,
+        )
 
     @classmethod
     def from_json_file(
@@ -311,24 +326,8 @@ class AnyFlux:
 
     def progress(self, expected_count=arg.DEFAULT, step=VERBOSE_STEP, message='Progress'):
         count = arg.undefault(expected_count, self.count)
-
-        def yield_items():
-            n = 0
-            for n, item in self.enumerated_items():
-                step_passed = (n + 1) % step == 0
-                pool_finished = 0 < count < (n + 1)
-                if step_passed or pool_finished:
-                    print(' ' * 80, end='\r')
-                    if count > 0:
-                        percent = fs.percent(str)((n + 1) / count)
-                        print('{}: {} ({}/{}) lines processed'.format(message, percent, n + 1, count), end='\r')
-                    else:
-                        print('{}: {} lines processed'.format(message, n + 1), end='\r')
-                yield item
-            print(' ' * 80, end='\r')
-            print('{}: Done. {} lines processed'.format(message, n + 1))
         return self.__class__(
-            yield_items(),
+            log.progress(self.data, name=message, count=count, step=step, logger=self.get_logger()),
             **self.get_meta()
         )
 
@@ -504,8 +503,7 @@ class AnyFlux:
         encoding = arg.undefault(encoding, self.tmp_files_encoding)
         if count is None:
             total_fn = file_template.format('total')
-            if verbose:
-                print('Collecting input into {}'.format(total_fn))
+            self.log('Collecting input into {}'.format(total_fn), verbose=verbose)
             count, total_fx = self.to_json().to_file(
                 total_fn,
                 encoding=encoding,
@@ -516,13 +514,11 @@ class AnyFlux:
         while part_start < count:
             part_no = int(part_start / step)
             part_fn = file_template.format(part_no)
-            if verbose:
-                print('Sorting part {} and saving into {}...'.format(part_no, part_fn))
+            self.log('Sorting part {} and saving into {} ... '.format(part_no, part_fn), verbose=verbose)
             part_fx = total_fx.take(step)
             if sort_each_by is not None:
                 part_fx = part_fx.memory_sort(key=sort_each_by, reverse=reverse, verbose=verbose)
-            if verbose:
-                print('Writing {} ...'.format(part_fn), end='\r')
+            self.log('Writing {} ...'.format(part_fn), end='\r', verbose=verbose)
             part_fx = part_fx.to_json().to_file(part_fn, encoding=encoding, verbose=verbose).map_to_any(json.loads)
             sorted_parts.append(part_fx)
             part_start = part_start + step
@@ -549,16 +545,13 @@ class AnyFlux:
     def memory_sort(self, key=lambda i: i, reverse=False, verbose=False):
         list_to_sort = self.get_list()
         count = len(list_to_sort)
-        if verbose:
-            print('Sorting {} items in memory...'.format(count), end='\r')
+        self.log('Sorting {} items in memory...'.format(count), end='\r', verbose=verbose)
         sorted_items = sorted(
             list_to_sort,
             key=key,
             reverse=reverse,
         )
-        if verbose:
-            print(' ' * 80, end='\r')
-            print('Sorting has been finished.', end='\r')
+        self.log('Sorting has been finished.', end='\r', verbose=verbose)
         self.count = len(sorted_items)
         return self.__class__(
             sorted_items,
@@ -577,8 +570,7 @@ class AnyFlux:
         counts = [f.count for f in flux_parts]
         props = self.get_meta()
         props['count'] = sum(counts)
-        if verbose:
-            print('Merging {} parts...'.format(len(iterables)))
+        self.log('Merging {} parts... '.format(len(iterables)), verbose=verbose)
         return self.__class__(
             merge_iter(iterables, key, reverse),
             **props
@@ -659,24 +651,23 @@ class AnyFlux:
         return self.map_to_records(function)
 
     def show(self, count=3):
-        print(self.class_name(), self.get_meta(), '\n')
+        self.log([self.class_name(), self.get_meta(), '\n'], verbose=True)
         if self.is_in_memory():
             for i in self.get_items()[:count]:
-                print(i)
+                self.log(i, verbose=True)
         else:
-            print(self.one())
+            self.log(self.one(), verbose=True)
 
     def print(self, flux_function='count', *args, **kwargs):
         value = self.get_property(flux_function, *args, **kwargs)
-        print(value)
+        self.log(value, verbose=True)
         return self
 
     def submit(self, external_object=print, flux_function='count', key=None, show=False):
         value = self.get_property(flux_function)
         if key is not None:
             value = {key: value}
-        if show:
-            print(value)
+        self.log(value, verbose=show)
 
         if callable(external_object):
             external_object(value)

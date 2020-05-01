@@ -131,9 +131,7 @@ class LinesFlux(fx.AnyFlux):
                 fh.write(str(i).encode(encoding) if gzip else str(i))
                 yield i
             fh.close()
-            if verbose:
-                print(' ' * 80, end='\r')
-                print('Done. {} rows has written into {}'.format(n + 1, filename))
+            self.log('Done. {} rows has written into {}'.format(n + 1, filename), verbose=verbose)
         if immediately:
             self.to_file(
                 filename,

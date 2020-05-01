@@ -8,6 +8,7 @@ try:  # Assume we're a sub-module in a package.
         arguments as arg,
         functions as fs,
         mappers as ms,
+        log_progress as log,
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
@@ -15,6 +16,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
         arguments as arg,
         functions as fs,
         mappers as ms,
+        log_progress as log,
     )
 
 
@@ -44,6 +46,19 @@ class AbstractDatabase(ABC):
 
     def get_context(self):
         return self.context
+
+    def get_logger(self):
+        if self.context is not None:
+            return self.context.get_logger()
+        else:
+            return log.get_logger()
+
+    def log(self, msg, level=arg.DEFAULT, end=arg.DEFAULT, verbose=True):
+        log.log(
+            logger=self.get_logger(),
+            msg=msg, level=level,
+            end=end, verbose=verbose,
+        )
 
     def table(self, name, schema=None, **kwargs):
         table = self.tables.get(name)
@@ -77,19 +92,19 @@ class AbstractDatabase(ABC):
             if '{}' in query:
                 query = query.format(table)
             result = self.execute(query, verbose=verbose)
-            if verbose and message_if_yes:
+            if message_if_yes:
                 if '{}' in message_if_yes:
                     message_if_yes = message_if_yes.format(table)
-                print(message_if_yes)
+                self.log(message_if_yes, verbose=verbose)
             return result
         else:
-            if '{}' in (message_if_no or ''):
+            if message_if_no and '{}' in message_if_no:
                 message_if_no = message_if_no.format(table)
             if stop_if_no:
                 raise ValueError(message_if_no)
             else:
-                if verbose and message_if_no:
-                    print(message_if_no)
+                if message_if_no:
+                    self.log(message_if_no, verbose=verbose)
 
     def create_table(self, name, schema, drop_if_exists=False, verbose=arg.DEFAULT):
         verbose = arg.undefault(verbose, self.verbose)
@@ -109,8 +124,7 @@ class AbstractDatabase(ABC):
             verbose=message if verbose is True else verbose,
         )
         self.post_create_action(name, verbose=verbose)
-        if verbose:
-            print('Table {name} is created.'.format(name=name))
+        self.log('Table {name} is created.'.format(name=name), verbose=verbose)
 
     def post_create_action(self, name, **kwargs):
         pass
@@ -254,9 +268,8 @@ class AbstractDatabase(ABC):
         write_count += skip_lines
         result_count = self.select_count(table)
         error_rate = (write_count - result_count) / write_count
-        if verbose:
-            message = 'Check counts: {} initial, {} uploaded, {} written, {} error_rate'
-            print(message.format(initial_count, write_count, result_count, error_rate))
+        message = 'Check counts: {} initial, {} uploaded, {} written, {} error_rate'
+        self.log(message.format(initial_count, write_count, result_count, error_rate), verbose=verbose)
         if max_error_rate is not None:
             message = 'Too many errors or skipped lines ({} > {})'.format(error_rate, max_error_rate)
             assert error_rate < max_error_rate, message
@@ -323,8 +336,8 @@ class PostgresDatabase(AbstractDatabase):
                 try:
                     self.connection.close()
                 except psycopg2.OperationalError:
-                    if verbose:
-                        print('Connection to {} already closed.'.format(self.host))
+                    message = 'Connection to {} already closed.'.format(self.host)
+                    self.log(message, level=log.LoggingLevel.Warning, verbose=verbose)
             else:
                 self.connection.close()
             self.connection = None
@@ -332,13 +345,12 @@ class PostgresDatabase(AbstractDatabase):
     def execute(self, query=TEST_QUERY, get_data=AUTO, commit=AUTO, data=None, verbose=arg.DEFAULT):
         verbose = arg.undefault(verbose, self.verbose)
         message = verbose if isinstance(verbose, str) else 'Execute:'
+        self.log([message, ms.remove_extra_spaces(query)], level=log.LoggingLevel.Debug, end='\r', verbose=verbose)
         if get_data == AUTO:
             if 'SELECT' in query and 'GRANT' not in query:
                 get_data, commit = True, False
             else:
                 get_data, commit = False, True
-        if verbose:
-            print(message, ms.remove_extra_spaces(query)[:60], '...', end='\r')
         has_connection = self.is_connected()
         cur = self.connect(reconnect=False).cursor()
         if data:
@@ -352,8 +364,7 @@ class PostgresDatabase(AbstractDatabase):
         cur.close()
         if not has_connection:
             self.connection.close()
-        if verbose:
-            print(message, 'successful', ' ' * 60, end='\r')
+        self.log([message, 'successful'], end='\r', verbose=bool(verbose))
         if get_data:
             return result
 
@@ -402,37 +413,26 @@ class PostgresDatabase(AbstractDatabase):
             columns=', '.join(columns),
             values=', '.join(placeholders),
         )
+        message = verbose if isinstance(verbose, str) else 'Committing {}-rows batches into {}'.format(step, table)
+        progress = log.Progress(message, count=count, verbose=verbose, logger=self.get_logger(), context=self.context)
+        progress.start()
         n = 0
         for n, row in enumerate(rows):
             if skip_errors:
                 try:
                     cur.execute(query, row)
                 except TypeError or IndexError as e:  # TypeError: not all arguments converted during string formatting
-                    if verbose:
-                        print('Error line:', str(row)[:80], '...')
-                    print(e.__class__.__name__, e)
+                    self.log(['Error line:', str(row)], level=log.LoggingLevel.Debug, verbose=verbose)
+                    self.log([e.__class__.__name__, e], level=log.LoggingLevel.Error)
             else:
                 cur.execute(query, row)
             if (n + 1) % step == 0:
-                if verbose:
-                    message = verbose if isinstance(verbose, str) else 'Committing {step} lines into {table}'.format(
-                        step=step, table=table,
-                    )
-                    if count:
-                        percent = fs.percent(str)((n + 1) / count)
-                        message = '{}: {} ({}/{}) lines processed'.format(message, percent, n + 1, count)
-                    else:
-                        message = '{}: {} lines processed'.format(message, n + 1)
-                    print(' ' * 80, end='\r')
-                    print(message, end='\r')
+                if not progress.position:
+                    progress.update(0)
                 conn.commit()
-        if verbose:
-            message = 'Committing last {count} lines into {table}...'.format(count=n % step, table=table)
-            print(message, end='\r')
+                progress.update(n)
         conn.commit()
-        if verbose:
-            message = 'Done. {count} lines has written into {table}...'.format(count=n, table=table)
-            print(message)
+        progress.finish(n)
         if return_count:
             return n
 
@@ -473,8 +473,7 @@ class ClickhouseDatabase(AbstractDatabase):
         cert_filename = self.conn_kwargs.get('cert_filename') or self.conn_kwargs.get('verify')
         if cert_filename:
             request_props['verify'] = cert_filename
-        if verbose:
-            print('Execute query:', query)
+        self.log('Execute query: {}'. format(query), verbose=verbose)
         res = requests.get(
             url,
             **request_props
@@ -498,15 +497,18 @@ class ClickhouseDatabase(AbstractDatabase):
         count = len(rows) if isinstance(rows, (list, tuple)) else expected_count
         if count == 0:
             message = 'Rows are empty, nothing to insert into {}.'.format(table)
-            if skip_errors and verbose:
-                print(message)
-            elif not skip_errors:
+            if skip_errors:
+                self.log(message, verbose=verbose)
+            else:
                 raise ValueError(message)
         query_template = 'INSERT INTO {table} ({columns}) VALUES ({values})'.format(
             table=table,
             columns=', '.join(columns),
             values='{}',
         )
+        message = verbose if isinstance(verbose, str) else 'Inserting into {table}'.format(table=table)
+        progress = log.Progress(message, count=count, verbose=verbose, logger=self.get_logger(), context=self.context)
+        progress.start()
         n = 0
         for n, row in enumerate(rows):
             values = ', '.format(row)
@@ -515,26 +517,13 @@ class ClickhouseDatabase(AbstractDatabase):
                 try:
                     self.execute(cur_query)
                 except requests.RequestException as e:
-                    if verbose:
-                        print('Error line:', str(row)[:80], '...')
-                    print(e.__class__.__name__, e)
+                    self.log(['Error line:', str(row)], level=log.LoggingLevel.Debug, verbose=verbose)
+                    self.log([e.__class__.__name__, e], level=log.LoggingLevel.Error)
             else:
                 self.execute(cur_query)
             if (n + 1) % step == 0:
-                if verbose:
-                    message = verbose if isinstance(verbose, str) else 'Inserting into {table}'.format(
-                        table=table,
-                    )
-                    if count:
-                        percent = fs.percent(str)((n + 1) / count)
-                        message = '{}: {} ({}/{}) lines processed'.format(message, percent, n + 1, count)
-                    else:
-                        message = '{}: {} lines processed'.format(message, n + 1)
-                    print(' ' * 80, end='\r')
-                    print(message, end='\r')
-        if verbose:
-            message = 'Done. {count} lines has written into {table}...'.format(count=n, table=table)
-            print(message)
+                progress.update(n)
+        progress.finish(n)
         if return_count:
             return n
 
@@ -558,7 +547,16 @@ class Table:
                 self.database.connect(reconnect=True)
 
     def get_context(self):
-        return self.database.context
+        return self.database.get_context()
+
+    def get_logger(self):
+        return self.database.get_logger()
+
+    def log(self, msg, level=arg.DEFAULT, end=arg.DEFAULT, verbose=True):
+        self.database.log(
+            msg=msg, level=level,
+            end=end, verbose=verbose,
+        )
 
     def get_data(self, verbose=arg.DEFAULT):
         return self.database.select_all(self.name, verbose=verbose)

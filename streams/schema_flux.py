@@ -1,9 +1,15 @@
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
-    from utils import functions as fs
+    from utils import (
+        functions as fs,
+        log_progress as log,
+    )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
-    from ..utils import functions as fs
+    from ..utils import (
+        functions as fs,
+        log_progress as log,
+    )
 
 
 NAME_POS, TYPE_POS, HINT_POS = 0, 1, 2  # schema fields
@@ -38,7 +44,7 @@ def check_rows(rows, schema, skip_errors=False):
         yield r
 
 
-def apply_schema_to_row(row, schema, skip_bad_values=False, verbose=True):
+def apply_schema_to_row(row, schema, skip_bad_values=False, logger=None):
     for c, (value, description) in enumerate(zip(row, schema)):
         field_type = description[TYPE_POS]
         try:
@@ -46,19 +52,23 @@ def apply_schema_to_row(row, schema, skip_bad_values=False, verbose=True):
             new_value = cast_function(value)
         except ValueError as e:
             field_name = description[NAME_POS]
-            if verbose:
-                print(
-                    'Error while casting field {} ({}) with value {} into type {}'.format(
-                        field_name, c,
-                        value, field_type,
-                    )
+            if logger:
+                message = 'Error while casting field {} ({}) with value {} into type {}'.format(
+                    field_name, c,
+                    value, field_type,
                 )
+                logger.log(msg=message, level=log.LoggingLevel.Error.value)
             if skip_bad_values:
-                if verbose:
-                    print('Error in row:', str(list(zip(row, schema)))[:80], '...')
+                if logger:
+                    message = 'Skipping bad value in row:'.format(list(zip(row, schema)))
+                    logger.log(msg=message, level=log.LoggingLevel.Debug.value)
                 new_value = None
             else:
-                print('Error in row:', str(list(zip(row, schema)))[:80], '...')
+                message = 'Error in row: {}...'.format(str(list(zip(row, schema)))[:80])
+                if logger:
+                    logger.log(msg=message, level=log.LoggingLevel.Warning.value)
+                else:
+                    log.show(message)
                 raise e
         row[c] = new_value
     return row
@@ -100,6 +110,9 @@ class SchemaFlux(fx.RowsFlux):
             skip_errors,
         )
 
+    def get_schema(self):
+        return self.schema
+
     def set_schema(self, schema, check=True):
         return SchemaFlux(
             check_rows(self.data, schema=schema) if check else self.data,
@@ -112,12 +125,11 @@ class SchemaFlux(fx.RowsFlux):
             for r in rows:
                 if skip_bad_rows:
                     try:
-                        yield apply_schema_to_row(r, schema)
+                        yield apply_schema_to_row(r, schema, skip_bad_values=False, logger=self if verbose else None)
                     except ValueError:
-                        if verbose:
-                            print('Skip bad row:', str(r)[:80], '...')
+                        self.log(['Skip bad row:', r], verbose=verbose)
                 else:
-                    yield apply_schema_to_row(r, schema, skip_bad_values=skip_bad_values, verbose=verbose)
+                    yield apply_schema_to_row(r, schema, skip_bad_values, logger=self if verbose else None)
         return SchemaFlux(
             apply_schema_to_rows(self.data),
             count=None if skip_bad_rows else self.count,
