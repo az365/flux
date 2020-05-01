@@ -100,7 +100,7 @@ class RowsFlux(fx.AnyFlux):
         fx_rows = fx.LinesFlux.from_file(
             filename,
             encoding=encoding, gzip=gzip,
-            skip_first_line=skip_first_line, max_n=max_n,
+            skip_first_line=skip_first_line, max_count=max_n,
             check=check,
             verbose=verbose,
         ).to_rows(

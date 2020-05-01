@@ -146,7 +146,7 @@ class AnyFlux:
         parsed_flux = fx.LinesFlux.from_file(
             filename,
             encoding=encoding, gzip=gzip,
-            skip_first_line=skip_first_line, max_n=max_n,
+            skip_first_line=skip_first_line, max_count=max_n,
             check=check,
             verbose=verbose,
         ).parse_json(
@@ -202,7 +202,7 @@ class AnyFlux:
 
     def copy(self):
         if self.is_in_memory():
-            copy_data = self.data.copy()
+            copy_data = self.get_list().copy()
         else:
             self.data, copy_data = tee(self.iterable(), 2)
         return self.__class__(
@@ -223,7 +223,7 @@ class AnyFlux:
             target_class = AnyFlux
             props = dict(count=self.count) if save_count else dict()
         return target_class(
-            function(self.data),
+            self.calc(function),
             **props
         )
 
@@ -309,21 +309,24 @@ class AnyFlux:
             **props
         )
 
-    def progress(self, count=arg.DEFAULT, step=VERBOSE_STEP, message='Progress'):
-        count = arg.undefault(count, self.count)
+    def progress(self, expected_count=arg.DEFAULT, step=VERBOSE_STEP, message='Progress'):
+        count = arg.undefault(expected_count, self.count)
 
         def yield_items():
+            n = 0
             for n, item in self.enumerated_items():
-                if (n % step == 0) or (n + 1 > count):
+                step_passed = (n + 1) % step == 0
+                pool_finished = 0 < count < (n + 1)
+                if step_passed or pool_finished:
                     print(' ' * 80, end='\r')
-                    if count:
+                    if count > 0:
                         percent = fs.percent(str)((n + 1) / count)
                         print('{}: {} ({}/{}) lines processed'.format(message, percent, n + 1, count), end='\r')
                     else:
                         print('{}: {} lines processed'.format(message, n + 1), end='\r')
                 yield item
             print(' ' * 80, end='\r')
-            print('{}: Done. {} lines processed'.format(message, count))
+            print('{}: Done. {} lines processed'.format(message, n + 1))
         return self.__class__(
             yield_items(),
             **self.get_meta()
@@ -347,7 +350,10 @@ class AnyFlux:
             for n, i in self.enumerated_items():
                 if n >= c:
                     yield i
-        next_items = self.get_items()[count:] if self.is_in_memory() else skip_items(count)
+        if self.count and count >= self.count:
+            next_items = []
+        else:
+            next_items = self.get_items()[count:] if self.is_in_memory() else skip_items(count)
         props = self.get_meta()
         props['count'] = self.count - count if self.count else None
         return self.__class__(
@@ -511,10 +517,12 @@ class AnyFlux:
             part_no = int(part_start / step)
             part_fn = file_template.format(part_no)
             if verbose:
-                print('Sorting part {} and saving into {}'.format(part_no, part_fn))
+                print('Sorting part {} and saving into {}...'.format(part_no, part_fn))
             part_fx = total_fx.take(step)
             if sort_each_by is not None:
-                part_fx = part_fx.memory_sort(key=sort_each_by, reverse=reverse)
+                part_fx = part_fx.memory_sort(key=sort_each_by, reverse=reverse, verbose=verbose)
+            if verbose:
+                print('Writing {} ...'.format(part_fn), end='\r')
             part_fx = part_fx.to_json().to_file(part_fn, encoding=encoding, verbose=verbose).map_to_any(json.loads)
             sorted_parts.append(part_fx)
             part_start = part_start + step
@@ -538,12 +546,19 @@ class AnyFlux:
             )
             items = take_items()
 
-    def memory_sort(self, key=lambda i: i, reverse=False):
+    def memory_sort(self, key=lambda i: i, reverse=False, verbose=False):
+        list_to_sort = self.get_list()
+        count = len(list_to_sort)
+        if verbose:
+            print('Sorting {} items in memory...'.format(count), end='\r')
         sorted_items = sorted(
-            self.to_memory().get_items(),
+            list_to_sort,
             key=key,
             reverse=reverse,
         )
+        if verbose:
+            print(' ' * 80, end='\r')
+            print('Sorting has been finished.', end='\r')
         self.count = len(sorted_items)
         return self.__class__(
             sorted_items,
@@ -573,15 +588,15 @@ class AnyFlux:
         keys = arg.update(keys)
         step = arg.undefault(step, self.max_items_in_memory)
         if len(keys) == 0:
-            key = lambda i: i
+            key = fs.same()
         elif len(keys) == 1:
             key = keys[0]
         else:
-            key = lambda i: tuple([f(i) for f in keys])
+            key = fs.composite_key(keys)
         if self.is_in_memory() or (step is None) or (self.count is not None and self.count <= step):
-            return self.memory_sort(key, reverse)
+            return self.memory_sort(key, reverse=reverse, verbose=verbose)
         else:
-            return self.disk_sort(key, reverse, step, verbose)
+            return self.disk_sort(key, reverse=reverse, step=step, verbose=verbose)
 
     def get_list(self):
         return list(self.get_items())

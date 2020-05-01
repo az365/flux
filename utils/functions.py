@@ -130,10 +130,33 @@ def apply_dict(dictionary, default=None):
     return func
 
 
-def elem_no(position, defatult=None):
+def elem_no(position, default=None):
     def func(array):
-        if len(array) > position:
+        if 0 <= position < len(array):
             return array[position]
         else:
-            return defatult
+            return default
+    return func
+
+
+def composite_key(*functions, ignore_errors=False):
+    key_functions = arg.update(functions)
+
+    def func(item):
+        result = list()
+        for f in key_functions:
+            if callable(f):
+                value = f(item)
+            else:
+                if isinstance(item, dict):
+                    value = item.get(f)
+                elif isinstance(item, (list, tuple)) and isinstance(f, int) and 0 <= f < len(item):
+                    value = item[f]
+                else:
+                    if ignore_errors:
+                        value = None
+                    else:
+                        raise ValueError('Field {} is not a correct column number for row {}.'.format(f, item))
+            result.append(value)
+        return tuple(result)
     return func

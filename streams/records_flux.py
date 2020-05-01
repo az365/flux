@@ -295,7 +295,8 @@ class RecordsFlux(fx.AnyFlux):
             encoding=arg.DEFAULT,
             gzip=False,
             check=arg.DEFAULT,
-            verbose=True
+            expected_count=arg.DEFAULT,
+            verbose=True,
     ):
         encoding = arg.undefault(encoding, fx.TMP_FILES_ENCODING)
         return fx.LinesFlux.from_file(
@@ -304,6 +305,7 @@ class RecordsFlux(fx.AnyFlux):
             encoding=encoding,
             gzip=gzip,
             check=check,
+            expected_count=expected_count,
             verbose=verbose,
         ).to_rows(
             delimiter=delimiter,
@@ -318,7 +320,7 @@ class RecordsFlux(fx.AnyFlux):
             encoding=None,
             gzip=False,
             default_value=None,
-            max_n=None,
+            max_count=None,
             check=True,
             verbose=False,
     ):
@@ -326,7 +328,7 @@ class RecordsFlux(fx.AnyFlux):
             filename,
             encoding=encoding,
             gzip=gzip,
-            max_n=max_n,
+            max_count=max_count,
             check=check,
             verbose=verbose,
         ).parse_json(

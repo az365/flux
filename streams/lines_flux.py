@@ -98,15 +98,17 @@ class LinesFlux(fx.AnyFlux):
             cls,
             filename,
             encoding=None, gzip=False,
-            skip_first_line=False, max_n=None,
+            skip_first_line=False, max_count=None,
             check=arg.DEFAULT,
+            expected_count=arg.DEFAULT,
             verbose=False, step=readers.VERBOSE_STEP,
     ):
         fx_lines = readers.from_file(
             filename,
             encoding=encoding, gzip=gzip,
-            skip_first_line=skip_first_line, max_n=max_n,
+            skip_first_line=skip_first_line, max_count=max_count,
             check=check,
+            expected_count=expected_count,
             verbose=verbose, step=step,
         )
         is_inherited = fx_lines.flux_type() != cls.__name__
@@ -130,6 +132,7 @@ class LinesFlux(fx.AnyFlux):
                 yield i
             fh.close()
             if verbose:
+                print(' ' * 80, end='\r')
                 print('Done. {} rows has written into {}'.format(n + 1, filename))
         if immediately:
             self.to_file(
