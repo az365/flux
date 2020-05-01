@@ -139,6 +139,32 @@ def elem_no(position, default=None):
     return func
 
 
+def value_by_key(key, default=None):
+    def func(item):
+        if isinstance(item, dict):
+            return item.get(key, default)
+        elif isinstance(item, (list, tuple)):
+            return item[key] if isinstance(key, int) and 0 <= key <= len(item) else None
+    return func
+
+
+def values_by_keys(keys, default=None):
+    def func(item):
+        return [value_by_key(k, default)(item) for k in keys]
+    return func
+
+
+def uniq():
+    def func(array):
+        if isinstance(array, (set, list, tuple)):
+            result = list()
+            for i in array:
+                if i not in result:
+                    result.append(i)
+            return result
+    return func
+
+
 def composite_key(*functions, ignore_errors=False):
     key_functions = arg.update(functions)
 
