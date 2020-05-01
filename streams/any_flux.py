@@ -52,12 +52,17 @@ class AnyFlux:
             max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
             tmp_files_template=fx.TMP_FILES_TEMPLATE,
             tmp_files_encoding=fx.TMP_FILES_ENCODING,
+            context=None,
     ):
         self.items = items
         self.count = count
         self.max_items_in_memory = max_items_in_memory
         self.tmp_files_template = tmp_files_template
         self.tmp_files_encoding = tmp_files_encoding
+        self.context = context
+
+    def get_context(self):
+        return self.context
 
     def get_meta(self):
         meta = self.__dict__.copy()

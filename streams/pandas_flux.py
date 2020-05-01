@@ -21,6 +21,7 @@ class PandasFlux(fx.RecordsFlux):
         max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
         tmp_files_template=fx.TMP_FILES_TEMPLATE,
         tmp_files_encoding=fx.TMP_FILES_ENCODING,
+        context=None,
     ):
         if isinstance(dataframe_or_series, pd.DataFrame):
             dataframe = dataframe_or_series
@@ -29,14 +30,13 @@ class PandasFlux(fx.RecordsFlux):
         else:  # isinstance(dataframe_or_series, (list, tuple)):
             dataframe = pd.DataFrame(data=dataframe_or_series)
         super().__init__(
-            # items = check_records(items) if check else items,
-            # items = check_dataframe(dataframe) if check else None,
             items=dataframe,
             count=count or dataframe.shape[1],
             check=check,
             max_items_in_memory=max_items_in_memory,
             tmp_files_template=tmp_files_template,
             tmp_files_encoding=tmp_files_encoding,
+            context=context,
         )
 
     def iterable(self, as_series=True):

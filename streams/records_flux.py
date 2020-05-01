@@ -53,6 +53,7 @@ class RecordsFlux(fx.AnyFlux):
             max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
             tmp_files_template=fx.TMP_FILES_TEMPLATE,
             tmp_files_encoding=fx.TMP_FILES_ENCODING,
+            context=None,
     ):
         super().__init__(
             items=check_records(items) if check else items,
@@ -60,6 +61,7 @@ class RecordsFlux(fx.AnyFlux):
             max_items_in_memory=max_items_in_memory,
             tmp_files_template=tmp_files_template,
             tmp_files_encoding=tmp_files_encoding,
+            context=context,
         )
         self.check = check
 
