@@ -86,6 +86,22 @@ class AnyFlux:
             **props
         )
 
+    def fill_meta(self, check=True, **meta):
+        props = self.get_meta()
+        if check:
+            unsupported = [k for k in meta if k not in props]
+            assert not unsupported, 'class {} does not support these properties: {}'.format(
+                self.flux_type(),
+                unsupported,
+            )
+        for key, value in props.items():
+            if value is None or value == arg.DEFAULT:
+                props[key] = meta.get(key)
+        return self.__class__(
+            self.data,
+            **props
+        )
+
     def class_name(self):
         return self.__class__.__name__
 
@@ -194,6 +210,9 @@ class AnyFlux:
             **self.get_meta()
         )
 
+    def calc(self, function):
+        return function(self.data)
+
     def apply(self, function, native=True, save_count=False):
         if native:
             target_class = self.__class__
@@ -296,9 +315,9 @@ class AnyFlux:
         def yield_items():
             for n, item in self.enumerated_items():
                 if (n % step == 0) or (n + 1 > count):
+                    print(' ' * 80, end='\r')
                     if count:
                         percent = fs.percent(str)((n + 1) / count)
-                        print(' ' * 80, end='\r')
                         print('{}: {} ({}/{}) lines processed'.format(message, percent, n + 1, count), end='\r')
                     else:
                         print('{}: {} lines processed'.format(message, n + 1), end='\r')
