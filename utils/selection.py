@@ -1,6 +1,8 @@
 try:  # Assume we're a sub-module in a package.
+    import fluxes as fx
     from utils import functions as fs
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
+    from .. import fluxes as fx
     from ..utils import functions as fs
 
 
@@ -75,7 +77,7 @@ def value_from_record(record, description):
         return record.get(description)
 
 
-def value_from_item(item, description):
+def value_from_any(item, description):
     if callable(description):
         return description(item)
     elif isinstance(description, (list, tuple)):
@@ -108,14 +110,14 @@ def row_from_any(item_in, *descriptions):
     c = 0
     for desc in descriptions:
         if desc == '*':
-            if isinstance(item_in, (list, tuple)):  # RowsFlux
+            if fx.is_row(item_in):
                 row_out = row_out[:c] + list(item_in) + row_out[c + 1:]
                 c += len(item_in)
             else:
                 row_out[c] = item_in
                 c += 1
         else:
-            row_out[c] = value_from_item(item_in, desc)
+            row_out[c] = value_from_any(item_in, desc)
             c += 1
     return tuple(row_out)
 

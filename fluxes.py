@@ -65,6 +65,14 @@ def is_flux(obj):
     )
 
 
+def is_row(item):
+    return RowsFlux.is_valid_item(item)
+
+
+def is_record(item):
+    return RecordsFlux.is_valid_item(item)
+
+
 def concat(*list_fluxes):
     list_fluxes = arg.update(list_fluxes)
     result = list_fluxes[0]

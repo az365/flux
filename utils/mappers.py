@@ -1,6 +1,11 @@
 import csv
 import re
 
+try:  # Assume we're a sub-module in a package.
+    import fluxes as fx
+except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
+    from .. import fluxes as fx
+
 
 RE_LETTERS = re.compile('[^a-zа-я ]')
 
@@ -120,3 +125,20 @@ def get_first_values(records, fields):
         for f in added_fields:
             empty_fields.remove(f)
     return dict_first_values
+
+
+def merge_two_items(first, second, default_right_name='_right'):
+    if fx.is_record(first):
+        result = first.copy()
+        if fx.is_record(second):
+            result.append(second)
+        else:
+            result[default_right_name] = second
+    elif fx.is_row(first):
+        if fx.is_row(second):
+            result = tuple(list(first) + list(second))
+        else:
+            result = tuple(list(first) + [second])
+    else:
+        result = (first, second)
+    return result

@@ -1,7 +1,15 @@
 try:  # Assume we're a sub-module in a package.
-    from utils import arguments as arg
+    import fluxes as fx
+    from utils import (
+        arguments as arg,
+        selection,
+    )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
-    from ..utils import arguments as arg
+    from .. import fluxes as fx
+    from ..utils import (
+        arguments as arg,
+        selection,
+    )
 
 
 DICT_CAST_TYPES = dict(bool=bool, int=int, float=float, str=str, text=str, date=str)
@@ -174,15 +182,12 @@ def composite_key(*functions, ignore_errors=False):
             if callable(f):
                 value = f(item)
             else:
-                if isinstance(item, dict):
+                if fx.is_record(item):
                     value = item.get(f)
-                elif isinstance(item, (list, tuple)) and isinstance(f, int) and 0 <= f < len(item):
-                    value = item[f]
+                elif fx.is_row(item):
+                    value = selection.value_from_row(item, f)
                 else:
-                    if ignore_errors:
-                        value = None
-                    else:
-                        raise ValueError('Field {} is not a correct column number for row {}.'.format(f, item))
+                    value = selection.value_from_any(item, f)
             result.append(value)
         return tuple(result)
     return func
