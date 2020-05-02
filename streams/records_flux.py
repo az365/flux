@@ -98,15 +98,10 @@ class RecordsFlux(fx.AnyFlux):
             **props
         )
 
-    def select(self, *fields, **selectors):
-        descriptions = list(fields)
-        for k, v in selection.topologically_sorted(selectors):
-            if isinstance(v, (list, tuple)):
-                descriptions.append([k] + list(v)),
-            else:
-                descriptions.append([k] + [v])
+    def select(self, *fields, **expressions):
+        descriptions = selection.flatten_descriptions(*fields, **expressions)
         return self.native_map(
-            lambda r: selection.get_fields(r, *descriptions),
+            lambda r: selection.record_from_record(r, *descriptions),
         )
 
     def filter(self, *fields, **expressions):
@@ -138,7 +133,7 @@ class RecordsFlux(fx.AnyFlux):
         key_function = get_key_function(keys)
         step = arg.undefault(step, self.max_items_in_memory)
         if self.is_in_memory() or (step is None) or (self.count is not None and self.count <= step):
-            return self.memory_sort(key_function, reverse)
+            return self.memory_sort(key_function, reverse, verbose=verbose)
         else:
             return self.disk_sort(key_function, reverse, step=step, verbose=verbose)
 

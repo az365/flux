@@ -1,3 +1,9 @@
+try:  # Assume we're a sub-module in a package.
+    from utils import functions as fs
+except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
+    from ..utils import functions as fs
+
+
 def process_description(d):
     if callable(d):
         function, inputs = d, list()
@@ -32,6 +38,18 @@ def topologically_sorted(selectors):
     return [(f, selectors[f]) for f in ordered_fields]
 
 
+def flatten_descriptions(*fields, **expressions):
+    descriptions = list(fields)
+    for k, v in topologically_sorted(expressions):
+        if isinstance(v, list):
+            descriptions.append([k] + v)
+        elif isinstance(v, tuple):
+            descriptions.append([k] + list(v))
+        else:
+            descriptions.append([k] + [v])
+    return descriptions
+
+
 def value_from_row(row, description):
     if callable(description):
         return description(row)
@@ -42,9 +60,8 @@ def value_from_row(row, description):
     elif isinstance(description, int):
         return row[description]
     else:
-        raise TypeError('selector description must be int, callable or tuple ({} as {} given)'.format(
-            description, type(description)
-        ))
+        message = 'field description must be int, callable or tuple ({} as {} given)'
+        raise TypeError(message.format(description, type(description)))
 
 
 def value_from_record(record, description):
@@ -58,14 +75,25 @@ def value_from_record(record, description):
         return record.get(description)
 
 
+def value_from_item(item, description):
+    if callable(description):
+        return description(item)
+    elif isinstance(description, (list, tuple)):
+        function, fields = process_description(description)
+        values = fs.values_by_keys(fields)(item)
+        return function(*values)
+    else:
+        return fs.value_by_key(description)(item)
+
+
 def tuple_from_record(record, descriptions):
     return tuple([value_from_record(record, d) for d in descriptions])
 
 
-def get_columns(row_in, *columns):
-    row_out = [None] * len(columns)
+def row_from_row(row_in, *descriptions):
+    row_out = [None] * len(descriptions)
     c = 0
-    for d in columns:
+    for d in descriptions:
         if d == '*':
             row_out = row_out[:c] + list(row_in) + row_out[c + 1:]
             c += len(row_in)
@@ -75,7 +103,41 @@ def get_columns(row_in, *columns):
     return tuple(row_out)
 
 
-def get_fields(rec_in, *descriptions):
+def row_from_any(item_in, *descriptions):
+    row_out = [None] * len(descriptions)
+    c = 0
+    for desc in descriptions:
+        if desc == '*':
+            if isinstance(item_in, (list, tuple)):  # RowsFlux
+                row_out = row_out[:c] + list(item_in) + row_out[c + 1:]
+                c += len(item_in)
+            else:
+                row_out[c] = item_in
+                c += 1
+        else:
+            row_out[c] = value_from_item(item_in, desc)
+            c += 1
+    return tuple(row_out)
+
+
+def record_from_any(item_in, *descriptions):
+    rec_out = dict()
+    for desc in descriptions:
+        assert isinstance(desc, (list, tuple)) and len(desc) > 1, 'for AnyFlux items description {} is not applicable'
+        f_out = desc[0]
+        if len(desc) == 2:
+            f_in = desc[1]
+            if callable(f_in):
+                rec_out[f_out] = f_in(item_in)
+            else:
+                rec_out[f_out] = rec_out.get(f_in)
+        else:
+            fs_in = desc[1:]
+            rec_out[f_out] = value_from_record(rec_out, fs_in)
+    return rec_out
+
+
+def record_from_record(rec_in, *descriptions):
     record = rec_in.copy()
     fields_out = list()
     for desc in descriptions:
@@ -88,8 +150,8 @@ def get_fields(rec_in, *descriptions):
                 record[f_out] = value_from_record(record, fs_in)
                 fields_out.append(f_out)
             else:
-                raise ValueError('incorrect selector: {}'.format(desc))
-        else:
+                raise ValueError('incorrect field description: {}'.format(desc))
+        else:  # desc is field name
             if desc not in record:
                 record[desc] = None
             fields_out.append(desc)

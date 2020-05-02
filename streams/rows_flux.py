@@ -58,7 +58,7 @@ class RowsFlux(fx.AnyFlux):
 
     def select(self, *columns):
         return self.native_map(
-            lambda r: selection.get_columns(r, *columns),
+            lambda r: selection.row_from_row(r, *columns),
         )
 
     def to_records(self, function=None, columns=tuple()):
@@ -93,14 +93,14 @@ class RowsFlux(fx.AnyFlux):
             filename,
             encoding=None, gzip=False,
             delimiter='\t',
-            skip_first_line=False, max_n=None,
+            skip_first_line=False, max_count=None,
             check=arg.DEFAULT,
             verbose=False,
     ):
         fx_rows = fx.LinesFlux.from_file(
             filename,
             encoding=encoding, gzip=gzip,
-            skip_first_line=skip_first_line, max_count=max_n,
+            skip_first_line=skip_first_line, max_count=max_count,
             check=check,
             verbose=verbose,
         ).to_rows(

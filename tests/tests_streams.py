@@ -115,7 +115,37 @@ def test_map_filter_take():
     assert received == expected
 
 
-def test_select():
+def test_any_select():
+    example = ['12', '123', '1234']
+    expected_1 = [
+        (2, 12.0, '12'),
+        (3, 123.0, '123'),
+        (4, 1234.0, '1234'),
+    ]
+    received_1 = fx.AnyFlux(
+        example,
+    ).select(
+        len,
+        float,
+        str,
+    ).get_list()
+    assert received_1 == expected_1, 'test case 1: AnyFlux to RowsFlux'
+    expected_2 = [
+        {'a': 2, 'b': 2.0, 'c': '12'},
+        {'a': 3, 'b': 3.0, 'c': '123'},
+        {'a': 4, 'b': 4.0, 'c': '1234'},
+    ]
+    received_2 = fx.AnyFlux(
+        example,
+    ).select(
+        a=len,
+        b=('a', float),
+        c=(str, ),
+    ).get_list()
+    assert received_2 == expected_2, 'test case 1: AnyFlux to RowsFlux'
+
+
+def test_records_select():
     expected_1 = [
         {'a': '1', 'd': None, 'e': None, 'f': '11', 'g': None, 'h': None},
         {'a': None, 'd': '2,22', 'e': None, 'f': 'NoneNone', 'g': None, 'h': None},
@@ -251,7 +281,6 @@ def test_add_records():
     ).add(
         readers.from_list(addition).to_records(),
     ).get_list()
-    print(received_1)
     assert received_1 == expected_1, 'test case 1i'
     received_2 = readers.from_list(
         EXAMPLE_INT_SEQUENCE,
@@ -260,7 +289,6 @@ def test_add_records():
         readers.from_list(addition).to_records(),
         before=True,
     ).get_list()
-    print(received_2)
     assert received_2 == expected_2, 'test case 2i'
 
 
@@ -478,6 +506,8 @@ if __name__ == '__main__':
     test_take()
     test_skip()
     test_map_filter_take()
+    test_any_select()
+    test_records_select()
     test_enumerated()
     test_save_and_read()
     test_add()

@@ -9,6 +9,7 @@ try:  # Assume we're a sub-module in a package.
         arguments as arg,
         functions as fs,
         log_progress as log,
+        selection,
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
@@ -16,6 +17,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
         arguments as arg,
         functions as fs,
         log_progress as log,
+        selection,
     )
 
 
@@ -154,14 +156,14 @@ class AnyFlux:
             cls,
             filename,
             encoding=None, gzip=False,
-            skip_first_line=False, max_n=None,
+            skip_first_line=False, max_count=None,
             check=arg.DEFAULT,
             verbose=False,
     ):
         parsed_flux = fx.LinesFlux.from_file(
             filename,
             encoding=encoding, gzip=gzip,
-            skip_first_line=skip_first_line, max_count=max_n,
+            skip_first_line=skip_first_line, max_count=max_count,
             check=check,
             verbose=verbose,
         ).parse_json(
@@ -307,6 +309,20 @@ class AnyFlux:
             filtered_items,
             **props
         )
+
+    def select(self, *columns, **expressions):
+        if columns and not expressions:
+            return self.to_rows(
+                function=lambda i: selection.row_from_any(i, *columns),
+            )
+        elif expressions and not columns:
+            descriptions = selection.flatten_descriptions(**expressions)
+            return self.to_records(
+                function=lambda i: selection.record_from_any(i, *descriptions),
+            )
+        else:
+            message = 'for AnyFlux use either columns (returns RowsFlux) or expressions (returns RecordsFlux), not both'
+            raise ValueError(message)
 
     def enumerated_items(self):
         for n, i in enumerate(self.get_items()):
@@ -640,9 +656,12 @@ class AnyFlux:
             count=self.count,
         )
 
-    def to_pairs(self, **kwargs):
+    def to_pairs(self, key=fs.value_by_key(0), value=fs.value_by_key(1)):
+        pairs_data = self.map(
+            lambda i: selection.row_from_any(i, key, value),
+        ).get_items()
         return fx.PairsFlux(
-            self.get_items(),
+            pairs_data,
             count=self.count,
         )
 
