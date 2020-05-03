@@ -476,6 +476,49 @@ def test_group_by():
     assert received_1 == expected, 'test case 1'
 
 
+def test_any_join():
+    example_a = ['a', 'b', 1]
+    example_b = ['c', 2, 33]
+    expected_0 = [('a', 'c'), ('b', 'c'), (1, 33)]
+    received_0 = fx.AnyFlux(
+        example_a,
+    ).map_side_join(
+        fx.AnyFlux(example_b),
+        key=type,
+        right_is_uniq=True,
+    ).get_list()
+    assert received_0 == expected_0, 'test case 0: right is uniq'
+    expected_1 = [('a', 'c'), ('b', 'c'), (1, 2), (1, 33)]
+    received_1 = fx.AnyFlux(
+        example_a,
+    ).map_side_join(
+        fx.AnyFlux(example_b),
+        key=type,
+        right_is_uniq=False,
+    ).get_list()
+    assert received_1 == expected_1, 'test case 1: right is not uniq'
+    expected_2 = [('a', 'c'), ('b', 'c'), (1, 2)]
+    received_2 = fx.AnyFlux(
+        example_a,
+    ).map_side_join(
+        fx.AnyFlux(example_b),
+        key=(type, lambda i: len(str(i))),
+        how='left',
+        right_is_uniq=False,
+    ).get_list()
+    assert received_2 == expected_2, 'test case 2: left join using composite key'
+    expected_3 = [('a', 'c'), ('b', 'c'), (1, 2), (None, 33)]
+    received_3 = fx.AnyFlux(
+        example_a,
+    ).map_side_join(
+        fx.AnyFlux(example_b),
+        key=(type, lambda i: len(str(i))),
+        how='full',
+        right_is_uniq=False,
+    ).get_list()
+    assert received_3 == expected_3, 'test case 3: full join using composite key'
+
+
 def test_to_rows():
     expected = [['a', '1'], ['b', '2,22'], ['c', '3']]
     received = readers.from_list(
@@ -521,5 +564,6 @@ if __name__ == '__main__':
     test_sort()
     test_sorted_group_by_key()
     test_group_by()
+    test_any_join()
     test_to_rows()
     test_parse_json()

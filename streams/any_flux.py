@@ -7,6 +7,7 @@ try:  # Assume we're a sub-module in a package.
     import fluxes as fx
     from utils import (
         arguments as arg,
+        mappers as ms,
         functions as fs,
         log_progress as log,
         selection,
@@ -15,6 +16,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     from .. import fluxes as fx
     from ..utils import (
         arguments as arg,
+        mappers as ms,
         functions as fs,
         log_progress as log,
         selection,
@@ -80,6 +82,11 @@ class AnyFlux:
     def get_meta(self):
         meta = self.__dict__.copy()
         meta.pop('data')
+        return meta
+
+    def get_meta_except_count(self):
+        meta = self.get_meta()
+        meta.pop('count')
         return meta
 
     def set_meta(self, **meta):
@@ -233,9 +240,7 @@ class AnyFlux:
     def apply(self, function, native=True, save_count=False):
         if native:
             target_class = self.__class__
-            props = self.get_meta()
-            if not save_count:
-                props.pop('count')
+            props = self.get_meta() if save_count else self.get_meta_except_count()
         else:
             target_class = AnyFlux
             props = dict(count=self.count) if save_count else dict()
@@ -299,8 +304,7 @@ class AnyFlux:
                 if not f(item):
                     return False
             return True
-        props = self.get_meta()
-        props.pop('count')
+        props = self.get_meta_except_count()
         filtered_items = filter(filter_function, self.iterable())
         if self.is_in_memory():
             filtered_items = list(filtered_items)
@@ -399,8 +403,7 @@ class AnyFlux:
             chain_records = chain(new_items, old_items)
         else:
             chain_records = chain(old_items, new_items)
-        props = self.get_meta()
-        props['count'] = None
+        props = self.get_meta_except_count()
         return self.__class__(
             chain_records,
             **props
@@ -606,6 +609,51 @@ class AnyFlux:
         else:
             return self.disk_sort(key, reverse=reverse, step=step, verbose=verbose)
 
+    def map_side_join(self, right, key, how='left', right_is_uniq=True):
+        assert how in ('left', 'right', 'inner', 'full')
+        if isinstance(key, (list, tuple)):
+            key = fs.composite_key(key)
+        if isinstance(right, dict):
+            dict_right = right
+        elif fx.is_flux(right):
+            dict_right = right.to_pairs(key, fs.same()).get_dict(of_lists=not right_is_uniq)
+        else:
+            raise TypeError('Join: right-argument must be dict or PairsFlux (got {})'.format(type(right)))
+
+        def joined_items():
+            keys_used = set()
+            for left_part in self.get_items():
+                cur_key = selection.value_from_any(left_part, key)
+                right_part = dict_right.get(cur_key)
+                if how == 'full':
+                    keys_used.add(cur_key)
+                if right_part:
+                    if right_is_uniq:
+                        out_items = [ms.merge_two_items(left_part, right_part)]
+                    elif isinstance(right_part, (list, tuple)):
+                        out_items = [ms.merge_two_items(left_part, i) for i in right_part]
+                    else:
+                        message = 'right part must be list or tuple while using right_is_uniq option (got {})'
+                        raise ValueError(message.format(type(right_part)))
+                else:
+                    if how in ('right', 'inner'):
+                        out_items = []
+                    else:
+                        out_items = [left_part]
+                if right_part or how != 'inner':
+                    yield from out_items
+            if how in ('right', 'full'):
+                for k in dict_right:
+                    if k not in keys_used:
+                        if right_is_uniq:
+                            yield ms.merge_two_items(None, dict_right[k])
+                        else:
+                            yield from [ms.merge_two_items(None, i) for i in dict_right[k]]
+        return fx.AnyFlux(
+            list(joined_items() if self.is_in_memory() else joined_items()),
+            **self.get_meta_except_count()
+        )
+
     def get_list(self):
         return list(self.get_items())
 
@@ -644,19 +692,21 @@ class AnyFlux:
     def to_rows(self, *args, **kwargs):
         function = kwargs.pop('function', None)
         if kwargs:
-            raise AttributeError(
-                'to_rows(): kwargs {} are not supported for class {}'.format(kwargs.keys(), self.class_name())
-            )
+            message = 'to_rows(): kwargs {} are not supported for class {}'.format(kwargs.keys(), self.class_name())
+            raise AttributeError(message)
         if args:
-            raise AttributeError(
-                'to_rows(): positional arguments are not supported for class {}'.format(self.class_name())
-            )
+            message = 'to_rows(): positional arguments are not supported for class {}'.format(self.class_name())
+            raise AttributeError(message)
         return fx.RowsFlux(
             map(function, self.get_items()) if function is not None else self.get_items(),
             count=self.count,
         )
 
     def to_pairs(self, key=fs.value_by_key(0), value=fs.value_by_key(1)):
+        if isinstance(key, (list, tuple)):
+            key = fs.composite_key(key)
+        if isinstance(value, (list, tuple)):
+            value = fs.composite_key(value)
         pairs_data = self.map(
             lambda i: selection.row_from_any(i, key, value),
         ).get_items()
