@@ -1,5 +1,9 @@
-import fluxes as fx
-from utils import readers
+try:  # Assume we're a sub-module in a package.
+    import fluxes as fx
+    from utils import readers
+except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
+    from .. import fluxes as fx
+    from ..utils import readers
 
 
 EXAMPLE_FILENAME = 'test_file.tmp'
@@ -517,6 +521,85 @@ def test_any_join():
         right_is_uniq=False,
     ).get_list()
     assert received_3 == expected_3, 'test case 3: full join using composite key'
+    expected_4 = [(1, 2), ('a', 'c'), ('b', 'c')]
+    received_4 = fx.AnyFlux(
+        example_a,
+    ).join(
+        fx.AnyFlux(example_b),
+        key=(lambda i: str(type(i)), lambda i: len(str(i))),
+        how='inner',
+    ).get_list()
+    assert received_4 == expected_4, 'test case 4: sorted left join'
+    expected_5 = [(1, 2), (None, 33), ('a', 'c'), ('b', 'c')]
+    received_5 = fx.AnyFlux(
+        example_a,
+    ).join(
+        fx.AnyFlux(example_b),
+        key=(lambda i: str(type(i)), lambda i: len(str(i))),
+        how='right',
+    ).get_list()
+    assert received_5 == expected_5, 'test case 5: sorted right join'
+
+
+def test_records_join():
+    example_a = [{'x': 0, 'y': 0, 'z': 0}, {'y': 2, 'z': 7}, {'x': 8, 'y': 9}]
+    example_b = [{'x': 1, 'y': 2, 'z': 3}, {'x': 4, 'y': 2}, {'x': 6, 'y': 0}]
+    expected_0 = [{'x': 6, 'y': 0, 'z': 0}, {'x': 4, 'y': 2, 'z': 7}, {'x': 8, 'y': 9}]
+    received_0 = fx.AnyFlux(
+        example_a,
+    ).map_side_join(
+        fx.AnyFlux(example_b),
+        key='y',
+        right_is_uniq=True,
+    ).get_list()
+    assert received_0 == expected_0, 'test case 0: right is uniq'
+    expected_1 = [{'x': 6, 'y': 0, 'z': 0}, {'x': 1, 'y': 2, 'z': 3}, {'x': 4, 'y': 2, 'z': 7}, {'x': 8, 'y': 9}]
+    received_1 = fx.AnyFlux(
+        example_a,
+    ).map_side_join(
+        fx.AnyFlux(example_b),
+        key='y',
+        right_is_uniq=False,
+    ).get_list()
+    assert received_1 == expected_1, 'test case 1: right is not uniq'
+    expected_2 = [{'x': 6, 'y': 0, 'z': 0}, {'x': 1, 'y': 2, 'z': 3}, {'x': 4, 'y': 2, 'z': 7}, {'x': 8, 'y': 9}]
+    received_2 = fx.AnyFlux(
+        example_a,
+    ).map_side_join(
+        fx.AnyFlux(example_b),
+        key='y',
+        how='left',
+        right_is_uniq=False,
+    ).get_list()
+    assert received_2 == expected_2, 'test case 2: left join'
+    expected_3 = [{'x': 6, 'y': 0, 'z': 0}, {'x': 1, 'y': 2, 'z': 3}, {'x': 4, 'y': 2, 'z': 7}, {'x': 8, 'y': 9}]
+    received_3 = fx.AnyFlux(
+        example_a,
+    ).map_side_join(
+        fx.AnyFlux(example_b),
+        key='y',
+        how='full',
+        right_is_uniq=False,
+    ).get_list()
+    assert received_3 == expected_3, 'test case 3: full join'
+    expected_4 = [{'x': 6, 'y': 0, 'z': 0}, {'x': 1, 'y': 2, 'z': 3}, {'x': 4, 'y': 2, 'z': 7}]
+    received_4 = fx.AnyFlux(
+        example_a,
+    ).join(
+        fx.AnyFlux(example_b),
+        key='y',
+        how='inner',
+    ).get_list()
+    assert received_4 == expected_4, 'test case 4: sorted left join'
+    expected_5 = [{'x': 6, 'y': 0, 'z': 0}, {'x': 1, 'y': 2, 'z': 3}, {'x': 4, 'y': 2, 'z': 7}]
+    received_5 = fx.AnyFlux(
+        example_a,
+    ).join(
+        fx.AnyFlux(example_b),
+        key='y',
+        how='right',
+    ).get_list()
+    assert received_5 == expected_5, 'test case 5: sorted right join'
 
 
 def test_to_rows():
@@ -565,5 +648,6 @@ if __name__ == '__main__':
     test_sorted_group_by_key()
     test_group_by()
     test_any_join()
+    test_records_join()
     test_to_rows()
     test_parse_json()

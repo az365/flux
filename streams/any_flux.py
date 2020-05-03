@@ -23,6 +23,9 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     )
 
 
+JOIN_TYPES = ('left', 'right', 'inner', 'full')
+
+
 def merge_iter(iterables, key_function, reverse=False):
     iterators_count = len(iterables)
     finished = [False] * iterators_count
@@ -608,7 +611,7 @@ class AnyFlux:
             return self.disk_sort(key_function, reverse=reverse, step=step, verbose=verbose)
 
     def map_side_join(self, right, key, how='left', right_is_uniq=True):
-        assert how in ('left', 'right', 'inner', 'full')
+        assert how in JOIN_TYPES
         if isinstance(key, (list, tuple)):
             key = fs.composite_key(key)
         if isinstance(right, dict):
@@ -647,9 +650,101 @@ class AnyFlux:
                             yield ms.merge_two_items(None, dict_right[k])
                         else:
                             yield from [ms.merge_two_items(None, i) for i in dict_right[k]]
-        return fx.AnyFlux(
+        return self.__class__(
             list(joined_items() if self.is_in_memory() else joined_items()),
             **self.get_meta_except_count()
+        )
+
+    def sorted_join(self, right, key, how='left', sorting_is_reversed=False):
+        assert fx.is_flux(right)
+        assert how in JOIN_TYPES, 'only {} join types are supported ({} given)'.format(JOIN_TYPES, how)
+        key = fs.composite_key(arg.update([key]))
+
+        def is_correct_order(previous_key, current_key):
+            if current_key == previous_key:
+                return True
+            elif sorting_is_reversed:
+                return fs.safe_more_than(current_key)(previous_key)
+            else:
+                return fs.safe_more_than(previous_key)(current_key)
+
+        def joined_items():
+            iter_left, iter_right = self.iterable(), right.iterable()
+            left_finished, right_finished = False, False
+            take_next_left, take_next_right = True, True
+            cur_left, cur_right = None, None
+            group_left, group_right = list(), list()
+            left_key, right_key = None, None
+            prev_left_key, prev_right_key = None, None
+
+            while not (left_finished and right_finished):
+                if take_next_left and not left_finished:
+                    try:
+                        cur_left = next(iter_left)
+                        left_key = key(cur_left)
+                    except StopIteration:
+                        left_finished = True
+                if take_next_right and not right_finished:
+                    try:
+                        cur_right = next(iter_right)
+                        right_key = key(cur_right)
+                    except StopIteration:
+                        right_finished = True
+                left_key_changed = left_finished or left_key != prev_left_key
+                right_key_changed = right_finished or right_key != prev_right_key
+                if left_key_changed and right_key_changed:
+                    if prev_left_key == prev_right_key:
+                        if how != 'outer':
+                            for out_left in group_left:
+                                for out_right in group_right:
+                                    yield ms.merge_two_items(out_left, out_right)
+                    else:
+                        if how in ('left', 'full', 'outer'):
+                            for out_left in group_left:
+                                yield ms.merge_two_items(out_left, None)
+                        if how in ('right', 'full', 'outer'):
+                            for out_right in group_right:
+                                yield ms.merge_two_items(None, out_right)
+                    group_left, group_right = list(), list()
+                if left_key == right_key:
+                    take_next_left, take_next_right = True, True
+                    prev_left_key, prev_right_key = left_key, right_key
+
+                    if take_next_left and not left_finished:
+                        group_left.append(cur_left)
+                    if take_next_right and not right_finished:
+                        group_right.append(cur_right)
+
+                elif is_correct_order(left_key, right_key) or right_finished:
+                    take_next_left, take_next_right = True, False
+                    assert is_correct_order(prev_left_key, left_key) or left_finished, 'left flux must be sorted'
+                    prev_left_key = left_key
+                    if take_next_left and not left_finished:
+                        group_left.append(cur_left)
+                else:  # next is right
+                    take_next_left, take_next_right = False, True
+                    assert is_correct_order(prev_right_key, right_key) or right_finished, 'right flux must be sorted'
+                    prev_right_key = right_key
+                    if take_next_right and not right_finished:
+                        group_right.append(cur_right)
+        return self.__class__(
+            list(joined_items() if self.is_in_memory() else joined_items()),
+            **self.get_meta_except_count()
+        )
+
+    def join(self, right, key, how='left', reverse=False, verbose=arg.DEFAULT):
+        return self.sort(
+            key,
+            reverse=reverse,
+            verbose=verbose,
+        ).sorted_join(
+            right.sort(
+                key,
+                reverse=reverse,
+                verbose=verbose,
+            ),
+            key=key, how=how,
+            sorting_is_reversed=reverse,
         )
 
     def get_list(self):

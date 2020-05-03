@@ -131,7 +131,7 @@ def merge_two_items(first, second, default_right_name='_right'):
     if fx.is_record(first):
         result = first.copy()
         if fx.is_record(second):
-            result.append(second)
+            result.update(second)
         else:
             result[default_right_name] = second
     elif fx.is_row(first):
