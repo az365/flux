@@ -124,6 +124,17 @@ def safe_more_than(other, including=False):
     return func
 
 
+def is_ordered(reverse=False, including=True):
+    def func(previous, current):
+        if current == previous:
+            return including
+        elif reverse:
+            return safe_more_than(current)(previous)
+        else:
+            return safe_more_than(previous)(current)
+    return func
+
+
 def maybe(*conditions):
     conditions = arg.update(conditions)
 
