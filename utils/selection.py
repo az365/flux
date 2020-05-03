@@ -1,9 +1,18 @@
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
-    from utils import functions as fs
+    from utils import (
+        functions as fs,
+        algo,
+    )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
-    from ..utils import functions as fs
+    from ..utils import (
+        functions as fs,
+        algo,
+    )
+
+
+IGNORE_CYCLIC_DEPENDENCIES = False
 
 
 def process_description(d):
@@ -21,28 +30,30 @@ def process_description(d):
     return function, inputs
 
 
-def topologically_sorted(selectors):
-    ordered_fields = list()
+def topologically_sorted(expressions, ignore_cycles=IGNORE_CYCLIC_DEPENDENCIES, logger=None):
     unordered_fields = list()
     unresolved_dependencies = dict()
-    for field, description in selectors.items():
+    for field, description in expressions.items():
         unordered_fields.append(field)
         _, dependencies = process_description(description)
-        unresolved_dependencies[field] = [d for d in dependencies if d in selectors.keys() and d != field]
-    while unordered_fields:  # Kahn's algorithm
-        for field in unordered_fields:
-            if not unresolved_dependencies[field]:
-                ordered_fields.append(field)
-                unordered_fields.remove(field)
-                for f in unordered_fields:
-                    if field in unresolved_dependencies[f]:
-                        unresolved_dependencies[f].remove(field)
-    return [(f, selectors[f]) for f in ordered_fields]
+        unresolved_dependencies[field] = [
+            d for d in dependencies
+            if d in expressions.keys() and d != field
+        ]
+    ordered_fields = algo.topologically_sorted(
+        nodes=unordered_fields,
+        edges=unresolved_dependencies,
+        ignore_cycles=ignore_cycles,
+        logger=logger,
+    )
+    return [(f, expressions[f]) for f in ordered_fields]
 
 
 def flatten_descriptions(*fields, **expressions):
     descriptions = list(fields)
-    for k, v in topologically_sorted(expressions):
+    logger = expressions.pop('logger', None)
+    ignore_cycles = logger is not None
+    for k, v in topologically_sorted(expressions, ignore_cycles=ignore_cycles, logger=logger):
         if isinstance(v, list):
             descriptions.append([k] + v)
         elif isinstance(v, tuple):
