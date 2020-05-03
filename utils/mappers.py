@@ -142,3 +142,17 @@ def merge_two_items(first, second, default_right_name='_right'):
     else:
         result = (first, second)
     return result
+
+
+def items_to_dict(items, key_function, value_function=None, of_lists=False):
+    result = dict()
+    for i in items:
+        k = key_function(i)
+        v = i if value_function is None else value_function(i)
+        if of_lists:
+            distinct = result.get(k, [])
+            if v not in distinct:
+                result[k] = distinct + [v]
+        else:
+            result[k] = v
+    return result
