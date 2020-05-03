@@ -9,8 +9,8 @@ try:  # Assume we're a sub-module in a package.
         arguments as arg,
         mappers as ms,
         functions as fs,
-        log_progress as log,
         selection,
+        log_progress,
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
@@ -18,12 +18,9 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
         arguments as arg,
         mappers as ms,
         functions as fs,
-        log_progress as log,
         selection,
+        log_progress,
     )
-
-
-VERBOSE_STEP = 1000
 
 
 def merge_iter(iterables, key_function, reverse=False):
@@ -74,7 +71,7 @@ class AnyFlux:
         if self.context is not None:
             return self.context.get_logger()
         else:
-            return log.get_logger()
+            return log_progress.get_logger()
 
     def get_items(self):
         return self.data
@@ -152,11 +149,12 @@ class AnyFlux:
         return value
 
     def log(self, msg, level=arg.DEFAULT, end=arg.DEFAULT, verbose=True):
-        log.log(
-            logger=self.get_logger(),
-            msg=msg, level=level,
-            end=end, verbose=verbose,
-        )
+        logger = self.get_logger()
+        if logger is not None:
+            logger.log(
+                msg=msg, level=level,
+                end=end, verbose=verbose,
+            )
 
     @classmethod
     def from_json_file(
@@ -344,10 +342,10 @@ class AnyFlux:
             **props
         )
 
-    def progress(self, expected_count=arg.DEFAULT, step=VERBOSE_STEP, message='Progress'):
+    def progress(self, expected_count=arg.DEFAULT, step=arg.DEFAULT, message='Progress'):
         count = arg.undefault(expected_count, self.count)
         return self.__class__(
-            log.progress(self.data, name=message, count=count, step=step, logger=self.get_logger()),
+            self.get_logger().progress(self.data, name=message, count=count, step=step),
             **self.get_meta()
         )
 

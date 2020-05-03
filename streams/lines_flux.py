@@ -163,9 +163,12 @@ class LinesFlux(fx.AnyFlux):
             encoding=encoding,
             gzip=gzip,
             end=end,
-            verbose=verbose,
+            verbose=False,
             immediately=False,
         )
+        if verbose:
+            message = ('Compressing gzip ito {}' if gzip else 'Writing {}').format(filename)
+            saved_flux = saved_flux.progress(expected_count=self.count, message=message)
         saved_flux.pass_items()
         meta = self.get_meta()
         meta.pop('count')

@@ -17,6 +17,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
 DEFAULT_STEP = 10
 DEFAULT_LOGGER_NAME = 'flux'
 DEFAULT_LOGGING_LEVEL = logging.WARNING
+DEFAULT_FORMATTER = '%(asctime)s - %(levelname)s - %(message)s'
 LINE_LEN = 100
 
 
@@ -50,56 +51,90 @@ def get_method_name(level=LoggingLevel.Info):
         return 'critical'
 
 
-def get_logger(name=DEFAULT_LOGGER_NAME):
-    logger = logging.getLogger(name)
-    logger.setLevel(DEFAULT_LOGGING_LEVEL)
+def get_logger(name=DEFAULT_LOGGER_NAME, level=DEFAULT_LOGGING_LEVEL):
+    logger = Logger(name=name, level=level)
     return logger
 
 
-def format_message(*messages, max_len=LINE_LEN):
-    messages = arg.update(messages)
-    message = ' '.join([str(m) for m in messages])
-    if len(message) > max_len:
-        message = message[:max_len - 2] + '..'
-    return message
+class Logger:
+    def __new__(cls, *args, **kwargs):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(Logger, cls).__new__(cls)
+        return cls.instance
 
+    def __init__(
+            self,
+            name=DEFAULT_LOGGER_NAME,
+            level=DEFAULT_LOGGING_LEVEL,
+            formatter=DEFAULT_FORMATTER,
+            max_line_len=LINE_LEN,
+    ):
+        self.base_logger = logging.getLogger(name)
+        self.base_logger.setLevel(level)
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(formatter)
+        ch.setFormatter(formatter)
+        self.base_logger.addHandler(ch)
+        self.level = level
+        self.max_line_len = max_line_len
 
-def progress(items, name='Progress', count=None, step=DEFAULT_STEP, logger=get_logger()):
-    return Progress(
-        name,
-        count=count,
-        logger=logger,
-    ).iterate(
-        items,
-        step=step,
-    )
+    def progress(self, items, name='Progress', count=None, step=DEFAULT_STEP):
+        return Progress(
+            name,
+            count=count,
+            logger=self,
+        ).iterate(
+            items,
+            step=step,
+        )
 
+    def log(self, msg, level=arg.DEFAULT, logger=arg.DEFAULT, end=arg.DEFAULT, verbose=True):
+        level = arg.undefault(level, LoggingLevel.Info if verbose else LoggingLevel.Debug)
+        logger = arg.undefault(logger, self.base_logger)
+        if isinstance(msg, (list, tuple)):
+            msg = self.format_message(*msg)
+        if not isinstance(level, LoggingLevel):
+            level = LoggingLevel(level)
+        if logger:
+            logging_method = getattr(logger, get_method_name(level))
+            logging_method(msg)
+        if verbose and level.value < logger.level:
+            self.show(msg, end=end)
 
-def clear_line():
-    print('\r', end='')
-    print(' ' * LINE_LEN, end='\r')
+    def debug(self, msg):
+        self.log(msg=msg, level=LoggingLevel.Debug)
 
+    def info(self, msg):
+        self.log(msg=msg, level=LoggingLevel.Info)
 
-def show(*messages, end=arg.DEFAULT, clear_before=True):
-    message = format_message(*messages, max_len=LINE_LEN)
-    end = arg.undefault(end, '\r' if message.endswith('...') else '\n')
-    if clear_before:
-        clear_line()
-    print(message, end=end)
+    def warning(self, msg):
+        self.log(msg=msg, level=LoggingLevel.Warning)
 
+    def error(self, msg):
+        self.log(msg=msg, level=LoggingLevel.Error)
 
-def log(msg, level=arg.DEFAULT, logger=arg.DEFAULT, end=arg.DEFAULT, verbose=True):
-    level = arg.undefault(level, LoggingLevel.Info if verbose else LoggingLevel.Debug)
-    logger = arg.undefault(logger, get_logger())
-    if isinstance(msg, (list, tuple)):
-        msg = format_message(*msg)
-    if not isinstance(level, LoggingLevel):
-        level = LoggingLevel(level)
-    if logger:
-        logging_method = getattr(logger, get_method_name(level))
-        logging_method(msg)
-    if verbose and level.value < logger.level:
-        show(msg, end=end)
+    def critical(self, msg):
+        self.log(msg=msg, level=LoggingLevel.Critical)
+
+    def format_message(self, *messages, max_len=arg.DEFAULT):
+        messages = arg.update(messages)
+        max_len = arg.undefault(max_len, self.max_line_len)
+        message = ' '.join([str(m) for m in messages])
+        if len(message) > max_len:
+            message = message[:max_len - 2] + '..'
+        return message
+
+    def clear_line(self):
+        print('\r', end='')
+        print(' ' * self.max_line_len, end='\r')
+
+    def show(self, *messages, end=arg.DEFAULT, clear_before=True):
+        message = self.format_message(*messages, max_len=LINE_LEN)
+        end = arg.undefault(end, '\r' if message.endswith('...') else '\n')
+        if clear_before:
+            self.clear_line()
+        print(message, end=end)
 
 
 class Progress:
@@ -108,7 +143,7 @@ class Progress:
             name='Progress',
             count=None,
             verbose=True,
-            logger=True,
+            logger=arg.DEFAULT,
             context=None,
     ):
         self.name = name
@@ -118,11 +153,10 @@ class Progress:
         self.position = 0
         self.start_time = None
         self.context = context
-        if isinstance(logger, bool):
-            if logger:
-                self.logger = context.logger if context else get_logger()
-            else:
-                self.logger = None  # Do not log
+        if logger is None:
+            self.logger = None
+        elif logger == arg.DEFAULT:
+            self.logger = context.get_logger() if context else get_logger()
         else:
             self.logger = logger
 
@@ -130,11 +164,13 @@ class Progress:
         return self.logger
 
     def log(self, msg, level=arg.DEFAULT, end=arg.DEFAULT, verbose=arg.DEFAULT):
-        log(
-            logger=self.get_logger(),
-            msg=msg, level=level, end=end,
-            verbose=arg.undefault(verbose, self.verbose),
-        )
+        logger = self.get_logger()
+        if logger is not None:
+            logger.log(
+                logger=self.get_logger(),
+                msg=msg, level=level, end=end,
+                verbose=arg.undefault(verbose, self.verbose),
+            )
 
     def update_now(self, cur):
         self.position = cur or self.position or 0
@@ -147,7 +183,8 @@ class Progress:
             line = '{}: {} items processed'.format(self.name, self.position + 1)
         self.log(line, level=LoggingLevel.Debug, end='\r')
 
-    def update_with_step(self, position, step=DEFAULT_STEP):
+    def update_with_step(self, position, step=arg.DEFAULT):
+        step = arg.undefault(step, DEFAULT_STEP)
         cur_increment = position - (self.position or 0)
         self.position = position
         step_passed = (self.position + 1) % step == 0
@@ -171,12 +208,12 @@ class Progress:
         elif self.verbose:
             self.log('{} ({} items): starting...'.format(self.name, self.expected_count))
 
-    def finish(self, cur=None):
-        self.update(cur)
+    def finish(self, position=None):
+        self.update(position)
         message = '{}: Done. {} items processed'.format(self.name, self.position + 1)
         self.log(message)
 
-    def iterate(self, items, name=None, expected_count=None, step=DEFAULT_STEP):
+    def iterate(self, items, name=None, expected_count=None, step=arg.DEFAULT):
         self.name = name or self.name
         if isinstance(items, (set, list, tuple)):
             self.expected_count = len(items)
