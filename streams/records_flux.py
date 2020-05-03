@@ -99,7 +99,12 @@ class RecordsFlux(fx.AnyFlux):
         )
 
     def select(self, *fields, **expressions):
-        descriptions = selection.flatten_descriptions(*fields, **expressions)
+        logger_for_cyclic_dependencies = self.get_logger()
+        descriptions = selection.flatten_descriptions(
+            *fields,
+            logger=logger_for_cyclic_dependencies,
+            **expressions
+        )
         return self.native_map(
             lambda r: selection.record_from_record(r, *descriptions),
         )

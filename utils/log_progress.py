@@ -71,11 +71,12 @@ class Logger:
     ):
         self.base_logger = logging.getLogger(name)
         self.base_logger.setLevel(level)
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(formatter)
-        ch.setFormatter(formatter)
-        self.base_logger.addHandler(ch)
+        if not self.base_logger.handlers:
+            ch = logging.StreamHandler()
+            ch.setLevel(logging.DEBUG)
+            formatter = logging.Formatter(formatter)
+            ch.setFormatter(formatter)
+            self.base_logger.addHandler(ch)
         self.level = level
         self.max_line_len = max_line_len
 
