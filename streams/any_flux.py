@@ -559,13 +559,14 @@ class AnyFlux:
             )
             items = take_items()
 
-    def memory_sort(self, key=lambda i: i, reverse=False, verbose=False):
+    def memory_sort(self, key=fs.same(), reverse=False, verbose=False):
+        key_function = fs.composite_key(key)
         list_to_sort = self.get_list()
         count = len(list_to_sort)
         self.log('Sorting {} items in memory...'.format(count), end='\r', verbose=verbose)
         sorted_items = sorted(
             list_to_sort,
-            key=key,
+            key=key_function,
             reverse=reverse,
         )
         self.log('Sorting has been finished.', end='\r', verbose=verbose)
@@ -575,11 +576,12 @@ class AnyFlux:
             **self.get_meta()
         )
 
-    def disk_sort(self, key=lambda i: i, reverse=False, step=arg.DEFAULT, verbose=False):
+    def disk_sort(self, key=fs.same(), reverse=False, step=arg.DEFAULT, verbose=False):
         step = arg.undefault(step, self.max_items_in_memory)
+        key_function = fs.composite_key(key)
         flux_parts = self.split_to_disk_by_step(
             step=step,
-            sort_each_by=key, reverse=reverse,
+            sort_each_by=key_function, reverse=reverse,
             verbose=verbose,
         )
         assert flux_parts, 'streams must be non-empty'
@@ -589,7 +591,7 @@ class AnyFlux:
         props['count'] = sum(counts)
         self.log('Merging {} parts... '.format(len(iterables)), verbose=verbose)
         return self.__class__(
-            merge_iter(iterables, key, reverse),
+            merge_iter(iterables, key_function, reverse),
             **props
         )
 
@@ -597,15 +599,13 @@ class AnyFlux:
         keys = arg.update(keys)
         step = arg.undefault(step, self.max_items_in_memory)
         if len(keys) == 0:
-            key = fs.same()
-        elif len(keys) == 1:
-            key = keys[0]
+            key_function = fs.same()
         else:
-            key = fs.composite_key(keys)
+            key_function = fs.composite_key(keys)
         if self.is_in_memory() or (step is None) or (self.count is not None and self.count <= step):
-            return self.memory_sort(key, reverse=reverse, verbose=verbose)
+            return self.memory_sort(key_function, reverse=reverse, verbose=verbose)
         else:
-            return self.disk_sort(key, reverse=reverse, step=step, verbose=verbose)
+            return self.disk_sort(key_function, reverse=reverse, step=step, verbose=verbose)
 
     def map_side_join(self, right, key, how='left', right_is_uniq=True):
         assert how in ('left', 'right', 'inner', 'full')

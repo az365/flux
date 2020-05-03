@@ -97,17 +97,31 @@ def is_in_sample(sample_rate, sample_bucket=1, as_str=True, hash_func=hash):
     return func
 
 
-def more_than(number, including=False):
+def more_than(other, including=False):
     def func(value):
         if including:
-            return value >= number
+            return value >= other
         else:
-            return value > number
+            return value > other
     return func
 
 
 def at_least(number):
     return more_than(number, including=True)
+
+
+def safe_more_than(other, including=False):
+    def func(value):
+        first, second = value, other
+        if type(first) != type(second):
+            if not (isinstance(first, (int, float)) and isinstance(second, (int, float))):
+                first = str(type(first))
+                second = str(type(second))
+        if including:
+            return first >= second
+        else:
+            return first > second
+    return func
 
 
 def maybe(*conditions):
@@ -173,7 +187,7 @@ def uniq():
     return func
 
 
-def composite_key(*functions, ignore_errors=False):
+def composite_key(*functions):
     key_functions = arg.update(functions)
 
     def func(item):
@@ -183,7 +197,7 @@ def composite_key(*functions, ignore_errors=False):
                 value = f(item)
             else:
                 if fx.is_record(item):
-                    value = item.get(f)
+                    value = selection.value_from_record(item, f)
                 elif fx.is_row(item):
                     value = selection.value_from_row(item, f)
                 else:
