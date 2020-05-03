@@ -114,39 +114,6 @@ class PairsFlux(fx.RowsFlux):
             fx_groups = fx_groups.to_memory()
         return fx_groups
 
-    def map_side_join(self, right, how='left'):
-        assert how in ('left', 'right', 'inner', 'outer')
-        if isinstance(right, dict):
-            dict_right = right
-        elif isinstance(right, PairsFlux):
-            dict_right = right.get_dict()
-        else:
-            raise TypeError('right must be dict or ParsFlux')
-
-        def get_items():
-            keys_used = set()
-            for key, value in self.data:
-                right_part = dict_right.get(key)
-                if how == 'outer':
-                    keys_used.add(key)
-                if right_part:
-                    if isinstance(value, dict):
-                        value.update(right_part)
-                    elif isinstance(value, (list, tuple)):
-                        value = list(value) + list(right_part)
-                if right_part or not (how == 'inner'):
-                    yield key, value
-            if how == 'outer':
-                for key in dict_right:
-                    if key not in keys_used:
-                        yield key, dict_right[key]
-        props = self.get_meta()
-        props.pop('count')
-        return PairsFlux(
-            list(get_items()) if self.is_in_memory() else get_items(),
-            **props
-        )
-
     def values(self):
         return self.secondary_flux()
 
