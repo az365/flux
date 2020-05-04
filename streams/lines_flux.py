@@ -6,17 +6,17 @@ import gzip as gz
 
 try:
     import fluxes as fx
+    import conns as cs
     from utils import (
         functions as fs,
         arguments as arg,
-        readers
     )
 except ImportError:
     from .. import fluxes as fx
+    from .. import conns as cs
     from ..utils import (
         functions as fs,
         arguments as arg,
-        readers
     )
 
 max_int = sys.maxsize
@@ -101,19 +101,26 @@ class LinesFlux(fx.AnyFlux):
             skip_first_line=False, max_count=None,
             check=arg.DEFAULT,
             expected_count=arg.DEFAULT,
-            verbose=False, step=readers.VERBOSE_STEP,
+            verbose=False,
+            step=arg.DEFAULT,
     ):
-        fx_lines = readers.from_file(
+        fx_lines = cs.TextFile(
             filename,
-            encoding=encoding, gzip=gzip,
-            skip_first_line=skip_first_line, max_count=max_count,
-            check=check,
+            encoding=encoding,
+            gzip=gzip,
             expected_count=expected_count,
-            verbose=verbose, step=step,
+            verbose=verbose,
+        ).to_lines_flux(
+            check=check,
+            step=step,
         )
         is_inherited = fx_lines.flux_type() != cls.__name__
         if is_inherited:
             fx_lines = fx_lines.map(function=fs.same(), to=cls.__name__)
+        if skip_first_line:
+            fx_lines = fx_lines.skip(1)
+        if max_count:
+            fx_lines = fx_lines.take(max_count)
         return fx_lines
 
     def lazy_save(
@@ -170,10 +177,9 @@ class LinesFlux(fx.AnyFlux):
             message = ('Compressing gzip ito {}' if gzip else 'Writing {}').format(filename)
             saved_flux = saved_flux.progress(expected_count=self.count, message=message)
         saved_flux.pass_items()
-        meta = self.get_meta()
-        meta.pop('count')
+        meta = self.get_meta_except_count()
         if return_flux:
-            return readers.from_file(
+            return self.from_file(
                 filename,
                 encoding=encoding,
                 gzip=gzip,
