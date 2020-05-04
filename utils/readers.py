@@ -3,18 +3,22 @@ import gzip as gz
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
     from utils import arguments as arg
+    from utils.log_progress import deprecated, deprecated_with_alternative
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
     from ..utils import arguments as arg
+    from ..utils.log_progress import deprecated, deprecated_with_alternative
 
 
 VERBOSE_STEP = 10000
 
 
+@deprecated_with_alternative('fx.AnyFlux()')
 def iterable(any_iterable):
     return fx.AnyFlux(any_iterable)
 
 
+@deprecated_with_alternative('fx.AnyFlux()')
 def from_list(input_list):
     def get_generator_from_list(mylist):
         for i in mylist:

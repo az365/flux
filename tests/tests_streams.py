@@ -19,8 +19,9 @@ def test_map():
     expected_types = ['AnyFlux', 'LinesFlux', 'LinesFlux', 'LinesFlux']
     received_types = list()
     expected_0 = [-i for i in EXAMPLE_INT_SEQUENCE]
-    received_0 = readers.from_list(
+    received_0 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
+    ).to_iter(
     ).map(
         lambda i: -i,
     ).submit(
@@ -29,7 +30,7 @@ def test_map():
     ).get_list()
     assert received_0 == expected_0, 'test case 0'
     expected_1 = [str(-i) for i in EXAMPLE_INT_SEQUENCE]
-    received_1 = readers.from_list(
+    received_1 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).map(
         lambda i: str(-i),
@@ -40,7 +41,7 @@ def test_map():
     ).get_list()
     assert received_1 == expected_1, 'test case 1'
     expected_2 = [str(-i) for i in EXAMPLE_INT_SEQUENCE]
-    received_2 = readers.from_list(
+    received_2 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).map(
         lambda i: str(-i),
@@ -51,7 +52,7 @@ def test_map():
     ).get_list()
     assert received_2 == expected_2, 'test case 2'
     expected_3 = [str(-i) for i in EXAMPLE_INT_SEQUENCE]
-    received_3 = readers.from_list(
+    received_3 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).map(
         lambda i: str(-i),
@@ -66,7 +67,7 @@ def test_map():
 
 def test_flat_map():
     expected = ['a', 'a', 'b', 'b']
-    received = readers.from_list(
+    received = fx.AnyFlux(
         ['a', 'b']
     ).flat_map(
         lambda i: [i, i],
@@ -76,7 +77,7 @@ def test_flat_map():
 
 def test_filter():
     expected = [7, 6, 8]
-    received = readers.from_list(
+    received = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).filter(
         lambda i: i > 5,
@@ -87,7 +88,7 @@ def test_filter():
 
 def test_take():
     expected = [1, 3, 5, 7, 9]
-    received = readers.from_list(
+    received = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).take(
         5,
@@ -97,7 +98,7 @@ def test_take():
 
 def test_skip():
     expected = [2, 4, 6, 8]
-    received = readers.from_list(
+    received = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).skip(
         5,
@@ -107,7 +108,7 @@ def test_skip():
 
 def test_map_filter_take():
     expected = [-1, -3, -5]
-    received = readers.from_list(
+    received = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).native_map(
         lambda i: -i,
@@ -155,7 +156,7 @@ def test_records_select():
         {'a': None, 'd': '2,22', 'e': None, 'f': 'NoneNone', 'g': None, 'h': None},
         {'a': None, 'd': None, 'e': '3', 'f': 'NoneNone', 'g': '3', 'h': '3'},
     ]
-    received_1 = readers.from_list(
+    received_1 = fx.AnyFlux(
         EXAMPLE_CSV_ROWS,
     ).to_lines(
     ).to_rows(
@@ -176,7 +177,7 @@ def test_records_select():
         (2.22, 'b', '2.22', 'b'),
         (3.00, 'c', '3', 'c'),
     ]
-    received_2 = readers.from_list(
+    received_2 = fx.AnyFlux(
         EXAMPLE_CSV_ROWS,
     ).to_lines(
     ).to_rows(
@@ -194,7 +195,7 @@ def test_records_select():
 
 def test_enumerated():
     expected = list(enumerate(EXAMPLE_INT_SEQUENCE))
-    received = readers.from_list(
+    received = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).enumerate().get_list()
     assert received == expected
@@ -202,7 +203,7 @@ def test_enumerated():
 
 def test_save_and_read():
     expected = [str(i) for i in EXAMPLE_INT_SEQUENCE]
-    received_0 = readers.from_list(
+    received_0 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).to_lines(
     ).lazy_save(
@@ -213,7 +214,7 @@ def test_save_and_read():
     ).get_list()
     assert received_0 == expected, 'test case 0: lazy_save()'
     assert received_1 == expected, 'test case 1: secondary fileholder'
-    readers.from_list(
+    fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).to_lines(
     ).to_file(
@@ -223,7 +224,7 @@ def test_save_and_read():
         EXAMPLE_FILENAME,
     ).get_list()
     assert received_2 == expected, 'test case 2: to_file()'
-    readers.from_list(
+    fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).to_rows(
         function=lambda i: [i],
@@ -246,29 +247,29 @@ def test_add():
     addition = list(reversed(EXAMPLE_INT_SEQUENCE))
     expected_1 = EXAMPLE_INT_SEQUENCE + addition
     expected_2 = addition + EXAMPLE_INT_SEQUENCE
-    received_1i = readers.from_list(
+    received_1i = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).add(
         addition
     ).get_list()
     assert received_1i == expected_1, 'test case 1i'
-    received_2i = readers.from_list(
+    received_2i = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).add(
         addition,
         before=True,
     ).get_list()
     assert received_2i == expected_2, 'test case 2i'
-    received_1f = readers.from_list(
+    received_1f = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).add(
-        readers.from_list(addition),
+        fx.AnyFlux(addition),
     ).get_list()
     assert received_1f == expected_1, 'test case 1f'
-    received_2f = readers.from_list(
+    received_2f = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).add(
-        readers.from_list(addition),
+        fx.AnyFlux(addition),
         before=True,
     ).get_list()
     assert received_2f == expected_2, 'test case 2f'
@@ -278,19 +279,19 @@ def test_add_records():
     addition = list(reversed(EXAMPLE_INT_SEQUENCE))
     expected_1 = list(map(lambda v: dict(item=v), EXAMPLE_INT_SEQUENCE + addition))
     expected_2 = list(map(lambda v: dict(item=v), addition + EXAMPLE_INT_SEQUENCE))
-    received_1 = readers.from_list(
+    received_1 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).map_to_records(
         lambda i: dict(item=i),
     ).add(
-        readers.from_list(addition).to_records(),
+        fx.AnyFlux(addition).to_records(),
     ).get_list()
     assert received_1 == expected_1, 'test case 1i'
-    received_2 = readers.from_list(
+    received_2 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).to_records(
     ).add(
-        readers.from_list(addition).to_records(),
+        fx.AnyFlux(addition).to_records(),
         before=True,
     ).get_list()
     assert received_2 == expected_2, 'test case 2i'
@@ -299,7 +300,7 @@ def test_add_records():
 def test_separate_first():
     expected = [EXAMPLE_INT_SEQUENCE[0], EXAMPLE_INT_SEQUENCE[1:]]
     received = list(
-        readers.from_list(
+        fx.AnyFlux(
             EXAMPLE_INT_SEQUENCE,
         ).separate_first()
     )
@@ -310,7 +311,7 @@ def test_separate_first():
 def test_split_by_pos():
     pos_1, pos_2 = 3, 5
     expected_1 = EXAMPLE_INT_SEQUENCE[:pos_1], EXAMPLE_INT_SEQUENCE[pos_1:]
-    a, b = readers.from_list(
+    a, b = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).split(
         pos_1,
@@ -322,7 +323,7 @@ def test_split_by_pos():
         [pos_2 - pos_1] + EXAMPLE_INT_SEQUENCE[pos_1:pos_2],
         [len(EXAMPLE_INT_SEQUENCE) - pos_2] + EXAMPLE_INT_SEQUENCE[pos_2:],
     )
-    a, b, c = readers.from_list(
+    a, b, c = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).split(
         (pos_1, pos_2),
@@ -333,7 +334,7 @@ def test_split_by_pos():
 
 def test_split_by_func():
     expected = [1, 3, 2, 4], [5, 7, 9, 6, 8]
-    a, b = readers.from_list(
+    a, b = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE
     ).split(
         lambda i: i >= 5,
@@ -348,7 +349,7 @@ def test_split_by_step():
         [9, 2, 4, 6],
         [8],
     ]
-    split_0 = readers.from_list(
+    split_0 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE
     ).set_meta(
         tmp_files_template='test_split_by_step_{}.tmp',
@@ -357,7 +358,7 @@ def test_split_by_step():
     )
     received_0 = [f.get_list() for f in split_0]
     assert received_0 == expected, 'test case 0'
-    split_1 = readers.from_list(
+    split_1 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE
     ).split_to_iter_by_step(
         step=4,
@@ -368,7 +369,7 @@ def test_split_by_step():
 
 def test_memory_sort():
     expected = [7, 9, 8, 6, 5, 4, 3, 2, 1]
-    received = readers.from_list(
+    received = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).memory_sort(
         key=lambda i: 777 if i == 7 else i,
@@ -379,7 +380,7 @@ def test_memory_sort():
 
 def test_disk_sort_by_key():
     expected = [[k, str(k) * k] for k in range(1, 10)]
-    received = readers.from_list(
+    received = fx.AnyFlux(
         [(k, str(k) * k) for k in EXAMPLE_INT_SEQUENCE],
     ).set_meta(
         tmp_files_template='test_disk_sort_by_key_{}.tmp',
@@ -392,7 +393,7 @@ def test_disk_sort_by_key():
 
 def test_sort():
     expected_0 = list(reversed(range(1, 10)))
-    received_0 = readers.from_list(
+    received_0 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).set_meta(
         tmp_files_template='test_disk_sort_by_key_{}.tmp',
@@ -402,7 +403,7 @@ def test_sort():
     ).get_list()
     assert received_0 == expected_0, 'test case 0'
     expected_1 = list(reversed(range(1, 10)))
-    received_1 = readers.from_list(
+    received_1 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).set_meta(
         tmp_files_template='test_disk_sort_by_key_{}.tmp',
@@ -413,7 +414,7 @@ def test_sort():
     ).get_list()
     assert received_1 == expected_1, 'test case 1'
     expected_2 = list(reversed(range(1, 10)))
-    received_2 = readers.from_list(
+    received_2 = fx.AnyFlux(
         EXAMPLE_INT_SEQUENCE,
     ).set_meta(
         tmp_files_template='test_disk_sort_by_key_{}.tmp',
@@ -438,7 +439,7 @@ def test_sorted_group_by_key():
         (2, [21]),
         (3, [31, 32, 33]),
     ]
-    received = readers.from_list(
+    received = fx.AnyFlux(
         example
     ).to_pairs(
     ).sorted_group_by_key(
@@ -457,7 +458,7 @@ def test_group_by():
         [21],
         [31, 32, 33],
     ]
-    received_0 = readers.from_list(example).to_rows().to_records(
+    received_0 = fx.AnyFlux(example).to_rows().to_records(
         columns=('x', 'y'),
     ).group_by(
         'x',
@@ -468,7 +469,7 @@ def test_group_by():
     ).get_list()
     assert received_0 == expected, 'test case 0'
 
-    received_1 = readers.from_list(example).to_rows().to_records(
+    received_1 = fx.AnyFlux(example).to_rows().to_records(
         columns=('x', 'y'),
     ).group_by(
         'x',
@@ -604,7 +605,7 @@ def test_records_join():
 
 def test_to_rows():
     expected = [['a', '1'], ['b', '2,22'], ['c', '3']]
-    received = readers.from_list(
+    received = fx.AnyFlux(
         EXAMPLE_CSV_ROWS,
     ).to_lines(
     ).to_rows(
@@ -616,7 +617,7 @@ def test_to_rows():
 def test_parse_json():
     example = ['{"a": "b"}', 'abc', '{"d": "e"}']
     expected = [{'a': 'b'}, {'err': 'err'}, {'d': 'e'}]
-    received = readers.from_list(
+    received = fx.AnyFlux(
         example,
     ).to_lines(
     ).parse_json(
