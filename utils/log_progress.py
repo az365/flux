@@ -1,5 +1,6 @@
 from enum import Enum
 from datetime import datetime
+from functools import wraps
 import logging
 
 try:  # Assume we're a sub-module in a package.
@@ -54,6 +55,26 @@ def get_method_name(level=LoggingLevel.Info):
 def get_logger(name=DEFAULT_LOGGER_NAME, level=DEFAULT_LOGGING_LEVEL):
     logger = Logger(name=name, level=level)
     return logger
+
+
+def deprecated(func):
+    @wraps(func)
+    def new_func(*args, **kwargs):
+        message = 'Method {}() is deprecated.'.format(func.__name__)
+        get_logger().warning(message)
+        return func(*args, **kwargs)
+    return new_func
+
+
+def deprecated_with_alternative(alternative):
+    def _deprecated(func):
+        @wraps(func)
+        def new_func(*args, **kwargs):
+            message = 'Method {}() is deprecated, use {} instead.'.format(func.__name__, alternative)
+            get_logger().warning(message)
+            return func(*args, **kwargs)
+        return new_func
+    return _deprecated
 
 
 class Logger:
