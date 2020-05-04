@@ -36,7 +36,10 @@ class AnyFlux:
             context=None,
     ):
         self.data = data
-        self.count = count
+        if isinstance(data, (list, tuple)):
+            self.count = len(data)
+        else:
+            self.count = count
         self.max_items_in_memory = max_items_in_memory
         self.tmp_files_template = tmp_files_template
         self.tmp_files_encoding = tmp_files_encoding
@@ -388,7 +391,7 @@ class AnyFlux:
     def add_flux(self, flux, before=False):
         old_count = self.count
         new_count = flux.count
-        if old_count is not None or new_count is not None:
+        if old_count is not None and new_count is not None:
             total_count = new_count + old_count
         else:
             total_count = None
@@ -485,44 +488,12 @@ class AnyFlux:
         else:
             raise TypeError('split(by): by-argument must be int, list, tuple or function, {} received'.format(type(by)))
 
-    def split_to_disk_by_step(
-            self,
-            step=arg.DEFAULT,
-            file_template=arg.DEFAULT, encoding=arg.DEFAULT,
-            sort_each_by=None, reverse=False,
-            verbose=True,
-    ):
-        count, total_fx = self.count, self
-        step = arg.undefault(step, self.max_items_in_memory)
-        file_template = arg.undefault(file_template, self.tmp_files_template)
-        encoding = arg.undefault(encoding, self.tmp_files_encoding)
-        if count is None:
-            total_fn = file_template.format('total')
-            self.log('Collecting input into {}'.format(total_fn), verbose=verbose)
-            count, total_fx = self.to_json().to_file(
-                total_fn,
-                encoding=encoding,
-            ).map_to_any(
-                json.loads,
-            ).separate_count()
-        part_start, part_no, sorted_parts = 0, None, list()
-        while part_start < count:
-            part_no = int(part_start / step)
-            part_fn = file_template.format(part_no)
-            self.log('Sorting part {} and saving into {} ... '.format(part_no, part_fn), verbose=verbose)
-            part_fx = total_fx.take(step)
-            if sort_each_by is not None:
-                part_fx = part_fx.memory_sort(key=sort_each_by, reverse=reverse, verbose=verbose)
-            self.log('Writing {} ...'.format(part_fn), end='\r', verbose=verbose)
-            part_fx = part_fx.to_json().to_file(part_fn, encoding=encoding, verbose=verbose).map_to_any(json.loads)
-            sorted_parts.append(part_fx)
-            part_start = part_start + step
-        return sorted_parts
-
     def split_to_iter_by_step(self, step):
+        iterable = self.iterable()
+
         def take_items():
             output_items = list()
-            for n, i in self.enumerated_items():
+            for n, i in enumerate(iterable):
                 output_items.append(i)
                 if n + 1 >= step:
                     break
@@ -536,6 +507,30 @@ class AnyFlux:
                 **props
             )
             items = take_items()
+
+    def split_to_disk_by_step(
+            self,
+            step=arg.DEFAULT,
+            file_template=arg.DEFAULT, encoding=arg.DEFAULT,
+            sort_each_by=None, reverse=False,
+            verbose=True,
+    ):
+        file_template = arg.undefault(file_template, self.tmp_files_template)
+        encoding = arg.undefault(encoding, self.tmp_files_encoding)
+        result_parts = list()
+        for part_no, fx_part in enumerate(self.to_iter().split_to_iter_by_step(step)):
+            part_fn = file_template.format(part_no)
+            self.log('Sorting part {} and saving into {} ... '.format(part_no, part_fn), verbose=verbose)
+            if sort_each_by:
+                fx_part = fx_part.memory_sort(
+                    key=sort_each_by,
+                    reverse=reverse,
+                    verbose=verbose,
+                )
+            self.log('Writing {} ...'.format(part_fn), end='\r', verbose=verbose)
+            fx_part = fx_part.to_json().to_file(part_fn, encoding=encoding).map_to_any(json.loads)
+            result_parts.append(fx_part)
+        return result_parts
 
     def memory_sort(self, key=fs.same(), reverse=False, verbose=False):
         key_function = fs.composite_key(key)
@@ -647,6 +642,12 @@ class AnyFlux:
         return self.__class__(
             items_as_list_in_memory,
             **props
+        )
+
+    def to_iter(self):
+        return self.__class__(
+            self.iterable(),
+            **self.get_meta()
         )
 
     def to_any(self):
