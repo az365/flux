@@ -29,6 +29,7 @@ def from_list(input_list):
     )
 
 
+@deprecated_with_alternative('conns.TextFile.count_lines()')
 def count_lines(filename, encoding=None, gzip=False, chunk_size=8192, end='\n'):
     if gzip:
         fileholder = gz.open(filename, 'r')
@@ -40,6 +41,7 @@ def count_lines(filename, encoding=None, gzip=False, chunk_size=8192, end='\n'):
     return count_n + 1
 
 
+@deprecated_with_alternative('conns.TextFile.to_lines_flux()')
 def from_file(
         filename,
         encoding=None, gzip=False,
@@ -92,6 +94,7 @@ def from_file(
     return flux_from_file
 
 
+@deprecated
 def from_parquet(parquet):
     def get_records():
         for n in range(parquet.num_rows):

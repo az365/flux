@@ -209,7 +209,7 @@ def test_save_and_read():
     ).lazy_save(
         EXAMPLE_FILENAME,
     ).get_list()
-    received_1 = readers.from_file(
+    received_1 = fx.LinesFlux.from_file(
         EXAMPLE_FILENAME
     ).get_list()
     assert received_0 == expected, 'test case 0: lazy_save()'
@@ -220,7 +220,7 @@ def test_save_and_read():
     ).to_file(
         EXAMPLE_FILENAME,
     )
-    received_2 = readers.from_file(
+    received_2 = fx.LinesFlux.from_file(
         EXAMPLE_FILENAME,
     ).get_list()
     assert received_2 == expected, 'test case 2: to_file()'
