@@ -1,7 +1,7 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from enum import Enum
 import gzip as gz
-
+import csv
 
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
@@ -172,7 +172,6 @@ class TextFile(AbstractFile):
             end='\n',
             expected_count=AUTO,
             folder=None,
-
             verbose=AUTO,
     ):
         super().__init__(
@@ -285,7 +284,7 @@ class JsonFile(TextFile):
             filename,
             encoding='utf8',
             gzip=False,
-            count=AUTO,
+            expected_count=AUTO,
             schema=AUTO,
             default_value=None,
             folder=None,
@@ -294,7 +293,7 @@ class JsonFile(TextFile):
             filename=filename,
             encoding=encoding,
             gzip=gzip,
-            expected_count=count,
+            expected_count=expected_count,
             folder=folder,
         )
         self.schema = schema
@@ -317,3 +316,61 @@ class JsonFile(TextFile):
             count=self.count,
             context=self.get_context(),
         )
+
+
+class CsvFile(TextFile):
+    def __init__(
+            self,
+            filename,
+            gzip=False,
+            encoding='utf8',
+            end='\n',
+            delimiter='\t',
+            first_line_is_title=True,
+            expected_count=AUTO,
+            schema=AUTO,
+    ):
+        super().__init__(
+            filename=filename,
+            gzip=gzip,
+            encoding=encoding,
+            end=end,
+            expected_count=expected_count,
+        )
+        self.delimiter = delimiter
+        self.first_line_is_title = first_line_is_title
+        self.schema = None
+        self.set_schema(schema)
+
+    def get_schema(self):
+        return self.schema
+
+    def set_schema(self, schema):
+        if schema is None:
+            self.schema = None
+        elif isinstance(schema, sh.SchemaDescription):
+            self.schema = schema
+        elif isinstance(schema, (list, tuple)):
+            self.schema = sh.SchemaDescription(schema)
+        elif schema == AUTO:
+            self.schema = None
+        else:
+            message = 'schema must be SchemaDescription of tuple with fields_description (got {})'.format(type(schema))
+            raise TypeError(message)
+
+    def get_rows(self):
+        for item in self.get_items():
+            row = csv.reader(item)
+            if self.schema is not None:
+                assert isinstance(self.schema, sh.SchemaDescription)
+                row = sh.SchemaRow(row, self.schema).data
+            yield row
+
+    def get_schema_rows(self):
+        assert self.schema is not None, 'For getting schematized rows schema must be defined.'
+        for row in self.get_rows():
+            yield sh.SchemaRow(row, schema=self.schema)
+
+    def get_records(self):
+        for item in self.get_schema_rows():
+            yield item.get_record()

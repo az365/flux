@@ -1,12 +1,11 @@
 from enum import Enum
 
 try:  # Assume we're a sub-module in a package.
-    import fluxes as fx
-    from utils import arguments as arg
     from connectors.files import (
         LocalFolder,
         AbstractFile,
         TextFile,
+        CsvFile,
         JsonFile,
     )
     from connectors.databases import (
@@ -16,12 +15,11 @@ try:  # Assume we're a sub-module in a package.
         Table,
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
-    from . import fluxes as fx
-    from .utils import arguments as arg
     from .connectors.files import (
         LocalFolder,
         AbstractFile,
         TextFile,
+        CsvFile,
         JsonFile,
     )
     from .connectors.databases import (
@@ -32,10 +30,19 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     )
 
 
+CONN_CLASSES = (
+    AbstractDatabase, Table,
+    PostgresDatabase, ClickhouseDatabase,
+    LocalFolder, AbstractFile,
+    TextFile, JsonFile, CsvFile,
+)
+
+
 class ConnType(Enum):
     LocalFolder = 'LocalFolder'
     TextFile = 'TextFile'
     JsonFile = 'JsonFile'
+    CsvFile = 'CsvFile'
     PostgresDatabase = 'PostgresDatabase'
     ClickhouseDatabase = 'ClickhouseDatabase'
     Table = 'Table'
@@ -52,9 +59,15 @@ def get_class(conn_type):
         return TextFile
     elif conn_type == ConnType.JsonFile:
         return JsonFile
+    elif conn_type == ConnType.CsvFile:
+        return CsvFile
     elif conn_type == ConnType.PostgresDatabase:
         return PostgresDatabase
     elif conn_type == ConnType.ClickhouseDatabase:
         return ClickhouseDatabase
     elif conn_type == ConnType.Table:
         return Table
+
+
+def is_conn(obj):
+    return isinstance(obj, CONN_CLASSES)
