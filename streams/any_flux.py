@@ -139,6 +139,17 @@ class AnyFlux:
                 end=end, verbose=verbose,
             )
 
+    def get_links(self):
+        if self.source is not None:
+            yield self.source
+
+    def close(self, recursively=False):
+        self.pass_items()
+        if recursively:
+            for link in self.get_links():
+                if hasattr(link, 'close'):
+                    link.close()
+
     @classmethod
     def from_json_file(
             cls,
