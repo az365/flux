@@ -60,8 +60,8 @@ def get_logger(name=DEFAULT_LOGGER_NAME, level=DEFAULT_LOGGING_LEVEL):
 def deprecated(func):
     @wraps(func)
     def new_func(*args, **kwargs):
-        message = 'Method {}() is deprecated.'.format(func.__name__)
-        get_logger().warning(message)
+        message = 'Method {}.{}() is deprecated.'
+        get_logger().warning(message.format(func.__module__, func.__name__))
         return func(*args, **kwargs)
     return new_func
 
@@ -70,8 +70,8 @@ def deprecated_with_alternative(alternative):
     def _deprecated(func):
         @wraps(func)
         def new_func(*args, **kwargs):
-            message = 'Method {}() is deprecated, use {} instead.'.format(func.__name__, alternative)
-            get_logger().warning(message)
+            message = 'Method {}.{}() is deprecated, use {} instead.'
+            get_logger().warning(message.format(func.__module__, func.__name__, alternative))
             return func(*args, **kwargs)
         return new_func
     return _deprecated
@@ -119,8 +119,9 @@ class Logger:
         if not isinstance(level, LoggingLevel):
             level = LoggingLevel(level)
         if logger:
-            logging_method = getattr(logger, get_method_name(level))
-            logging_method(msg)
+            if level.value >= self.level:
+                logging_method = getattr(logger, get_method_name(level))
+                logging_method(msg)
         if verbose and level.value < logger.level:
             self.show(msg, end=end)
 
@@ -155,7 +156,8 @@ class Logger:
         message = self.format_message(*messages, max_len=LINE_LEN)
         end = arg.undefault(end, '\r' if message.endswith('...') else '\n')
         if clear_before:
-            self.clear_line()
+            remainder = self.max_line_len - len(message)
+            message += ' ' * remainder
         print(message, end=end)
 
 
