@@ -128,17 +128,21 @@ def get_first_values(records, fields):
 
 
 def merge_two_items(first, second, default_right_name='_right'):
-    if fx.is_record(first):
+    if fx.is_row(first):
+        if second is None:
+            result = first
+        elif fx.is_row(second):
+            result = tuple(list(first) + list(second))
+        else:
+            result = tuple(list(first) + [second])
+    elif fx.is_record(first):
         result = first.copy()
         if fx.is_record(second):
             result.update(second)
         else:
             result[default_right_name] = second
-    elif fx.is_row(first):
-        if fx.is_row(second):
-            result = tuple(list(first) + list(second))
-        else:
-            result = tuple(list(first) + [second])
+    elif first is None and fx.is_record(second):
+        result = second
     else:
         result = (first, second)
     return result
