@@ -50,18 +50,20 @@ class RecordsFlux(fx.AnyFlux):
             data,
             count=None,
             check=True,
+            source=None,
+            context=None,
             max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
             tmp_files_template=fx.TMP_FILES_TEMPLATE,
             tmp_files_encoding=fx.TMP_FILES_ENCODING,
-            context=None,
     ):
         super().__init__(
             check_records(data) if check else data,
             count=count,
+            source=source,
+            context=context,
             max_items_in_memory=max_items_in_memory,
             tmp_files_template=tmp_files_template,
             tmp_files_encoding=tmp_files_encoding,
-            context=context,
         )
         self.check = check
 
@@ -205,7 +207,7 @@ class RecordsFlux(fx.AnyFlux):
         add_title_row = kwargs.pop('add_title_row', None)
         columns = arg.update(columns, kwargs.pop('columns', None))
         if kwargs:
-            raise AttributeError('to_rows(): {} arguments are not supported'.format(kwargs.keys()))
+            raise ValueError('to_rows(): {} arguments are not supported'.format(kwargs.keys()))
 
         def get_rows(columns_list):
             if add_title_row:

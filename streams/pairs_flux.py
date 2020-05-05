@@ -39,19 +39,21 @@ class PairsFlux(fx.RowsFlux):
             count=None,
             check=True,
             secondary=None,
+            source=None,
+            context=None,
             max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
             tmp_files_template=fx.TMP_FILES_TEMPLATE,
             tmp_files_encoding=fx.TMP_FILES_ENCODING,
-            context=None,
     ):
         super().__init__(
             check_pairs(data) if check else data,
             count=count,
             check=check,
+            source=source,
+            context=context,
             max_items_in_memory=max_items_in_memory,
             tmp_files_template=tmp_files_template,
             tmp_files_encoding=tmp_files_encoding,
-            context=context,
         )
         if secondary is None:
             self.secondary = fx.FluxType.AnyFlux

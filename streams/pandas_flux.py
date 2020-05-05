@@ -14,14 +14,15 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
 
 class PandasFlux(fx.RecordsFlux):
     def __init__(
-        self,
-        data,
-        count=None,
-        check=False,
-        max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
-        tmp_files_template=fx.TMP_FILES_TEMPLATE,
-        tmp_files_encoding=fx.TMP_FILES_ENCODING,
-        context=None,
+            self,
+            data,
+            count=None,
+            check=False,
+            source=None,
+            context=None,
+            max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
+            tmp_files_template=fx.TMP_FILES_TEMPLATE,
+            tmp_files_encoding=fx.TMP_FILES_ENCODING,
     ):
         if isinstance(data, pd.DataFrame):
             dataframe = data
@@ -33,10 +34,11 @@ class PandasFlux(fx.RecordsFlux):
             dataframe,
             count=count or dataframe.shape[1],
             check=check,
+            source=source,
+            context=context,
             max_items_in_memory=max_items_in_memory,
             tmp_files_template=tmp_files_template,
             tmp_files_encoding=tmp_files_encoding,
-            context=context,
         )
 
     def iterable(self, as_series=True):

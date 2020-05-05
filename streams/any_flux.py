@@ -30,20 +30,22 @@ class AnyFlux:
             self,
             data,
             count=None,
+            source=None,
+            context=None,
             max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
             tmp_files_template=fx.TMP_FILES_TEMPLATE,
             tmp_files_encoding=fx.TMP_FILES_ENCODING,
-            context=None,
     ):
         self.data = data
         if isinstance(data, (list, tuple)):
             self.count = len(data)
         else:
             self.count = count
+        self.source = source
+        self.context = context
         self.max_items_in_memory = max_items_in_memory
         self.tmp_files_template = tmp_files_template
         self.tmp_files_encoding = tmp_files_encoding
-        self.context = context
 
     def get_context(self):
         return self.context
@@ -672,10 +674,10 @@ class AnyFlux:
         function = kwargs.pop('function', None)
         if kwargs:
             message = 'to_rows(): kwargs {} are not supported for class {}'.format(kwargs.keys(), self.class_name())
-            raise AttributeError(message)
+            raise ValueError(message)
         if args:
             message = 'to_rows(): positional arguments are not supported for class {}'.format(self.class_name())
-            raise AttributeError(message)
+            raise ValueError(message)
         return fx.RowsFlux(
             map(function, self.get_items()) if function is not None else self.get_items(),
             count=self.count,

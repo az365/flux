@@ -58,13 +58,13 @@ class LinesFlux(fx.AnyFlux):
         super().__init__(
             check_lines(data) if check else data,
             count=count,
+            source=source,
+            context=context,
             max_items_in_memory=max_items_in_memory,
             tmp_files_template=tmp_files_template,
             tmp_files_encoding=tmp_files_encoding,
-            context=context,
         )
         self.check = check
-        self.source = source
 
     @staticmethod
     def is_valid_item(item):
