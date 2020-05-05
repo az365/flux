@@ -9,6 +9,7 @@ try:  # Assume we're a sub-module in a package.
     from utils import (
         arguments as arg,
         functions as fs,
+        schema as sh,
         selection,
         log_progress,
     )
@@ -18,6 +19,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     from ..utils import (
         arguments as arg,
         functions as fs,
+        schema as sh,
         selection,
         log_progress,
     )
@@ -74,6 +76,21 @@ class LocalFolder:
             self.files[name] = file
         return file
 
+    def get_items(self):
+        return self.files
+
+    def get_links(self):
+        for item in self.files:
+            yield from item.get_links()
+
+    def close(self, name=None):
+        if name:
+            file = self.files.get(name)
+            if file:
+                file.close()
+        for file in self.files:
+            file.close()
+
 
 class AbstractFile(ABC):
     def __init__(
@@ -88,6 +105,7 @@ class AbstractFile(ABC):
             self.folder = folder
         else:
             self.folder = None
+        self.links = list()
 
     def get_context(self):
         if self.folder:
@@ -106,6 +124,9 @@ class AbstractFile(ABC):
                 msg=msg, level=level,
                 end=end, verbose=verbose,
             )
+
+    def get_links(self):
+        return self.links
 
     @staticmethod
     def get_flux_type():
@@ -151,7 +172,8 @@ class AbstractFile(ABC):
         return self.fileholder is not None
 
     def close(self):
-        self.fileholder.close()
+        if self.is_opened():
+            self.fileholder.close()
 
     def open(self, mode='r', reopen=False):
         if self.is_opened():
