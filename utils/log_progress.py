@@ -15,16 +15,16 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     )
 
 
-DEFAULT_STEP = 10
+DEFAULT_STEP = 1000
 DEFAULT_LOGGER_NAME = 'flux'
 DEFAULT_LOGGING_LEVEL = logging.WARNING
 DEFAULT_FORMATTER = '%(asctime)s - %(levelname)s - %(message)s'
-LINE_LEN = 100
+DEFAULT_LINE_LEN = 120
+LONG_LINE_LEN = 600
 
 
 class OperationStatus(Enum):
     New = 'new'
-    # Started = 'started'
     InProgress = 'in_progress'
     Done = 'done'
 
@@ -88,7 +88,7 @@ class Logger:
             name=DEFAULT_LOGGER_NAME,
             level=DEFAULT_LOGGING_LEVEL,
             formatter=DEFAULT_FORMATTER,
-            max_line_len=LINE_LEN,
+            max_line_len=DEFAULT_LINE_LEN,
     ):
         self.base_logger = logging.getLogger(name)
         self.base_logger.setLevel(level)
@@ -153,7 +153,7 @@ class Logger:
         print(' ' * self.max_line_len, end='\r')
 
     def show(self, *messages, end=arg.DEFAULT, clear_before=True):
-        message = self.format_message(*messages, max_len=LINE_LEN)
+        message = self.format_message(*messages, max_len=LONG_LINE_LEN if end == '\n' else self.max_line_len)
         end = arg.undefault(end, '\r' if message.endswith('...') else '\n')
         if clear_before:
             remainder = self.max_line_len - len(message)

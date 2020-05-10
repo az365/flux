@@ -712,16 +712,16 @@ class AnyFlux:
         return self.map_to_records(function)
 
     def show(self, count=3):
-        self.log([self.class_name(), self.get_meta(), '\n'], verbose=True)
+        self.log([self.class_name(), self.get_meta()], end='\n', verbose=True)
         if self.is_in_memory():
             for i in self.get_items()[:count]:
                 self.log(i, verbose=True)
         else:
-            self.log(self.one(), verbose=True)
+            self.log(self.one(), end='\n', verbose=True)
 
     def print(self, flux_function='count', *args, **kwargs):
         value = self.get_property(flux_function, *args, **kwargs)
-        self.log(value, verbose=True)
+        self.log(value, end='\n', verbose=True)
         return self
 
     def submit(self, external_object=print, flux_function='count', key=None, show=False):
