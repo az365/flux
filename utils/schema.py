@@ -22,6 +22,7 @@ class FieldType(Enum):
     IsoDatetime = 'datetime'
     Bool = 'bool'
     Tuple = 'tuple'
+    Dict = 'dict'
 
 
 def any_to_bool(value):
@@ -55,8 +56,21 @@ FIELD_TYPES = {
     FieldType.IsoDatetime.value: dict(py=date, pg='timestamp', ch='Datetime', str_to_py=datetime.fromisoformat),
     FieldType.Bool.value: dict(py=bool, pg='bool', ch='UInt8', str_to_py=any_to_bool, py_to_ch=safe_converter(int)),
     FieldType.Tuple.value: dict(py=tuple, pg='text', str_to_py=eval),
+    FieldType.Dict.value: dict(py=dict, pg='text', str_to_py=eval),
 }
 AGGR_HINTS = (None, 'id', 'cat', 'measure')
+HEURISTIC_SUFFIX_TO_TYPE = {
+    'id': FieldType.Int,
+    'count': FieldType.Int,
+    'sum': FieldType.Float,
+    'share': FieldType.Float,
+    'is': FieldType.Bool,
+    'has': FieldType.Bool,
+    'ids': FieldType.Tuple,
+    'names': FieldType.Tuple,
+    'hist': FieldType.Dict,
+    None: FieldType.Str,
+}
 
 
 def get_canonic_type(field_type, ignore_absent=False):
@@ -92,6 +106,21 @@ def get_dialect_for_conn_type(db_obj):
         return 'ch'
     else:
         return 'str'
+
+
+def detect_schema_by_title_row(title_row):
+    schema = SchemaDescription([])
+    for name in title_row:
+        name_parts = name.split('_')
+        field_type = HEURISTIC_SUFFIX_TO_TYPE[None]
+        for suffix in HEURISTIC_SUFFIX_TO_TYPE:
+            if suffix in name_parts:
+                field_type = HEURISTIC_SUFFIX_TO_TYPE[suffix]
+                break
+        schema.append_field(
+            FieldDescription(name, field_type)
+        )
+    return schema
 
 
 class FieldDescription:
@@ -133,23 +162,26 @@ class SchemaDescription:
         assert isinstance(fields_descriptions, (list, tuple))
         self.fields_descriptions = list()
         for field in fields_descriptions:
-            if isinstance(field, FieldDescription):
-                field_desc = field
-            elif isinstance(field, str):
-                field_desc = FieldDescription(field)
-            elif isinstance(field, (list, tuple)):
-                field_desc = FieldDescription(*field)
-            elif isinstance(field, dict):
-                field_desc = FieldDescription(**field)
-            else:
-                raise TypeError
-            self.fields_descriptions.append(field_desc)
+            self.append_field(field)
+
+    def append_field(self, field):
+        if isinstance(field, FieldDescription):
+            field_desc = field
+        elif isinstance(field, str):
+            field_desc = FieldDescription(field)
+        elif isinstance(field, (list, tuple)):
+            field_desc = FieldDescription(*field)
+        elif isinstance(field, dict):
+            field_desc = FieldDescription(**field)
+        else:
+            raise TypeError
+        self.fields_descriptions.append(field_desc)
 
     def get_fields_count(self):
         return len(self.fields_descriptions)
 
     def get_schema_str(self, dialect):
-        if dialect not in DIALECTS:
+        if dialect is not None and dialect not in DIALECTS:
             dialect = get_dialect_for_conn_type(dialect)
         field_strings = [
             '{} {}'.format(c.name, c.get_type_in(dialect))
@@ -166,6 +198,12 @@ class SchemaDescription:
     def get_fields_positions(self, names):
         columns = self.get_columns()
         return [columns.index(f) for f in names]
+
+    def get_converters(self, from_='str', to_='py'):
+        converters = list()
+        for desc in self.fields_descriptions:
+            converters.append(desc.get_converter(from_, to_))
+        return tuple(converters)
 
 
 class SchemaRow:

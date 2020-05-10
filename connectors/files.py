@@ -108,6 +108,7 @@ class LocalFolder:
         meta.pop('files')
         return meta
 
+
 class AbstractFile(ABC):
     def __init__(
             self,
@@ -384,6 +385,7 @@ class JsonFile(TextFile):
         return fx.RecordsFlux(
             self.get_items(verbose=verbose),
             count=self.count,
+            source=self,
             context=self.get_context(),
         )
 
@@ -429,18 +431,46 @@ class CsvFile(TextFile):
         elif isinstance(schema, (list, tuple)):
             self.schema = sh.SchemaDescription(schema)
         elif schema == AUTO:
-            self.schema = None
+            if self.first_line_is_title:
+                self.schema = self.detect_schema_by_title_row()
+            else:
+                self.schema = None
         else:
             message = 'schema must be SchemaDescription of tuple with fields_description (got {})'.format(type(schema))
             raise TypeError(message)
 
-    def get_rows(self):
-        for item in self.get_items():
-            row = csv.reader(item)
-            if self.schema is not None:
-                assert isinstance(self.schema, sh.SchemaDescription)
-                row = sh.SchemaRow(row, self.schema).data
-            yield row
+    def detect_schema_by_title_row(self, set_schema=False, verbose=AUTO):
+        assert self.first_line_is_title, 'Can detect schema by title row only if first line is a title row'
+        verbose = arg.undefault(verbose, self.verbose)
+        lines = self.get_lines(skip_first=False, check=False, verbose=False)
+        rows = csv.reader(lines, delimiter=self.delimiter) if self.delimiter else csv.reader(lines)
+        title_row = next(rows)
+        self.close()
+        schema = sh.detect_schema_by_title_row(title_row)
+        self.log('Schema detected by title row: {}'.format(schema.get_schema_str(None)), end='\n', verbose=verbose)
+        if set_schema:
+            self.schema = set_schema
+        return schema
+
+    def get_rows(self, convert_types=True, verbose=AUTO, step=AUTO):
+        lines = self.get_lines(
+            skip_first=self.first_line_is_title,
+            verbose=verbose, step=step,
+        )
+        rows = csv.reader(lines, delimiter=self.delimiter) if self.delimiter else csv.reader(lines)
+        if self.schema is not None or not convert_types:
+            yield from rows
+        else:
+            converters = self.get_schema().get_converters('str', 'py')
+            for row in rows:
+                converted_row = list()
+                for value, converter in zip(row, converters):
+                    converted_value = converter(value)
+                    converted_row.append(converted_value)
+                yield converted_row
+
+    def get_items(self, verbose=AUTO, step=AUTO):
+        return self.get_rows(verbose=verbose, step=step)
 
     def get_schema_rows(self):
         assert self.schema is not None, 'For getting schematized rows schema must be defined.'
