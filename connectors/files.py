@@ -477,9 +477,41 @@ class CsvFile(TextFile):
         for row in self.get_rows():
             yield sh.SchemaRow(row, schema=self.schema)
 
-    def get_records(self):
-        for item in self.get_schema_rows():
-            yield item.get_record()
+    def get_records(self, convert_types=True):
+        for item in self.get_rows(convert_types=convert_types):
+            yield {k: v for k, v in zip(self.get_schema().get_columns(), item)}
+
+    def get_dict(self, key, value):
+        result = dict()
+        for r in self.get_records():
+            result[r.get(key)] = r.get(value)
+        return result
+
+    def to_rows_flux(self, name=None, **kwargs):
+        data = self.get_rows()
+        flux = fx.RowsFlux(
+            **self.flux_kwargs(data=data, **kwargs)
+        )
+        if name:
+            flux.set_name(name)
+        return flux
+
+    def to_schema_flux(self, name=None, **kwargs):
+        data = self.get_rows()
+        flux = fx.SchemaFlux(
+            schema=self.schema,
+            **self.flux_kwargs(data=data, **kwargs)
+        )
+        if name:
+            flux.set_name(name)
+        return flux
+
+    def to_records_flux(self, name=None, **kwargs):
+        data = self.get_records()
+        flux = fx.RecordsFlux(**self.flux_kwargs(data=data, **kwargs))
+        if name:
+            flux.set_name(name)
+        return flux
 
 
 class TsvFile(CsvFile):
