@@ -42,6 +42,9 @@ class FluxContext:
         self.flux_instances = dict()
         self.conn_instances = dict()
 
+        self.fx = fx
+        self.cs = cs
+
     def get_context(self):
         return self
 
@@ -219,19 +222,3 @@ class FluxContext:
         self.close_all(verbose=True)
         self.leave_all_conns(recursively=True)
         self.leave_all_fluxes(recursively=True)
-
-    @staticmethod
-    def flux_classes():
-        return fx
-
-    @staticmethod
-    def conn_classes():
-        return cs
-
-    @staticmethod
-    def flux_types():
-        return fx.FluxType
-
-    @staticmethod
-    def conn_types():
-        return cs.ConnType
