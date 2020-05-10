@@ -42,6 +42,10 @@ class AnyFlux:
         else:
             self.count = count
         self.source = source
+        if source:
+            self.name = source.get_name()
+        else:
+            self.name = arg.DEFAULT
         self.context = context
         self.max_items_in_memory = max_items_in_memory
         self.tmp_files_template = tmp_files_template
@@ -53,8 +57,18 @@ class AnyFlux:
         return self.context
 
     def put_into_context(self, name=arg.DEFAULT):
-        name = arg.undefault(name, self.source.get_name() if self.source else arg.DEFAULT)
+        name = arg.undefault(name, self.name)
         self.context.flux(self, name=name)
+
+    def get_name(self):
+        return self.name
+
+    def set_name(self, name, register=True):
+        if register:
+            old_name = self.get_name()
+            self.context.rename_flux(old_name, name)
+        self.name = name
+        return self
 
     def get_logger(self):
         if self.context is not None:
@@ -68,6 +82,7 @@ class AnyFlux:
     def get_meta(self):
         meta = self.__dict__.copy()
         meta.pop('data')
+        meta.pop('name')
         return meta
 
     def get_meta_except_count(self):

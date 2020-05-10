@@ -82,19 +82,18 @@ class FluxContext:
     def flux(self, flux, name=arg.DEFAULT, check=True, **kwargs):
         name = arg.undefault(name, self.get_default_instance_name())
         if fx.is_flux(flux):
-            flux_object = flux.fill_meta(
-                context=self,
-                **self.flux_config
-            )
+            flux_object = flux
         else:
             flux_class = fx.get_class(flux)
-            flux_object = flux_class(
-                context=self,
-                **kwargs
-            ).fill_meta(
-                check=check,
-                **self.flux_config
-            )
+            flux_object = flux_class(**kwargs)
+        flux_object = flux_object.set_name(
+            name,
+            registe=False
+        ).fill_meta(
+            context=self,
+            check=check,
+            **self.flux_config
+        )
         self.flux_instances[name] = flux_object
         return flux_object
 
@@ -108,6 +107,11 @@ class FluxContext:
                 if hasattr(c, 'get_items'):
                     if name in c.get_items():
                         return c.get_items()[name]
+
+    def rename_flux(self, old_name, new_name):
+        assert old_name in self.flux_instances, 'Flux must be defined (name {} is not registred)'.format(old_name)
+        if new_name != old_name:
+            self.flux_instances[new_name] = self.flux_instances.pop(old_name)
 
     def get_job_folder(self):
         job_folder_obj = self.conn_instances.get('job')
