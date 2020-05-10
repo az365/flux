@@ -46,9 +46,15 @@ class AnyFlux:
         self.max_items_in_memory = max_items_in_memory
         self.tmp_files_template = tmp_files_template
         self.tmp_files_encoding = tmp_files_encoding
+        if context is not None:
+            self.put_into_context()
 
     def get_context(self):
         return self.context
+
+    def put_into_context(self, name=arg.DEFAULT):
+        name = arg.undefault(name, self.source.get_name() if self.source else arg.DEFAULT)
+        self.context.flux(self, name=name)
 
     def get_logger(self):
         if self.context is not None:
@@ -144,11 +150,18 @@ class AnyFlux:
             yield self.source
 
     def close(self, recursively=False):
-        self.pass_items()
+        try:
+            self.pass_items()
+            closed_fluxes = 1
+        except BaseException as e:
+            self.log(['Error while trying to close flux:', e], level=log_progress.LoggingLevel.Warning)
+            closed_fluxes = 0
+        closed_links = 0
         if recursively:
             for link in self.get_links():
                 if hasattr(link, 'close'):
-                    link.close()
+                    closed_links += link.close() or 0
+        return closed_fluxes, closed_links
 
     @classmethod
     def from_json_file(
