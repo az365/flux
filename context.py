@@ -27,7 +27,7 @@ DEFAULT_FLUX_CONFIG = dict(
 class FluxContext:
     def __new__(cls, *args, **kwargs):
         if not hasattr(cls, 'instance'):
-            cls.instance = super(FluxContext, cls).__new__(cls, *args, **kwargs)
+            cls.instance = super(FluxContext, cls).__new__(cls)
         return cls.instance
 
     def __init__(
@@ -41,10 +41,6 @@ class FluxContext:
         self.conn_config = arg.undefault(conn_config, dict())
         self.flux_instances = dict()
         self.conn_instances = dict()
-
-        tmp_files_template = self.flux_config.get('tmp_files_template')
-        if tmp_files_template:
-            self.conn_instances['tmp'] = cs.LocalFolder(tmp_files_template, context=self)
 
     def get_context(self):
         return self
@@ -99,8 +95,26 @@ class FluxContext:
                     if name in c.get_items():
                         return c.get_items()[name]
 
+    def get_job_folder(self):
+        job_folder_obj = self.conn_instances.get('job')
+        if job_folder_obj:
+            return job_folder_obj
+        else:
+            job_folder_path = self.flux_config.get('job_folder', '')
+            job_folder_obj = cs.LocalFolder(job_folder_path, context=self)
+            self.conn_instances['job'] = job_folder_obj
+            return job_folder_obj
+
     def get_tmp_folder(self):
-        return self.conn_instances.get('tmp')
+        tmp_folder = self.conn_instances.get('tmp')
+        if tmp_folder:
+            return tmp_folder
+        else:
+            tmp_files_template = self.flux_config.get('tmp_files_template')
+            if tmp_files_template:
+                tmp_folder = cs.LocalFolder(tmp_files_template, context=self)
+                self.conn_instances['tmp'] = tmp_folder
+                return tmp_folder
 
     def close_conn(self, name, recursively=False, verbose=True):
         closed_count = 0
