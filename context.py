@@ -59,25 +59,39 @@ class FluxContext:
                 end=end, verbose=verbose,
             )
 
-    def conn(self, conn_type, name=arg.DEFAULT, check=True, **kwargs):
-        name = arg.undefault(name, datetime.now().isoformat())
-        conn_class = cs.get_class(conn_type)
-        conn_object = conn_class(context=self, **kwargs)
+    @staticmethod
+    def get_default_instance_name():
+        return datetime.now().isoformat()
+
+    def conn(self, conn, name=arg.DEFAULT, check=True, redefine=True, **kwargs):
+        name = arg.undefault(name, self.get_default_instance_name())
+        conn_object = self.conn_instances.get(name)
+        if conn_object:
+            if redefine or cs.is_conn(conn):
+                self.leave_conn(name, verbose=False)
+            else:
+                return conn_object
+        if cs.is_conn(conn):
+            conn_class = cs.get_class(conn)
+            conn_object = conn_class(context=self, **kwargs)
         self.conn_instances[name] = conn_object
-        if check:
+        if check and hasattr(conn_object, 'check'):
             conn_object.check()
         return conn_object
 
-    def flux(self, flux_type, name=arg.DEFAULT, check=True, **kwargs):
-        name = arg.undefault(name, datetime.now().isoformat())
-        flux_class = fx.get_class(flux_type)
-        flux_object = flux_class(
-            context=self,
-            **kwargs
-        ).fill_meta(
-            check=check,
-            **self.flux_config
-        )
+    def flux(self, flux, name=arg.DEFAULT, check=True, **kwargs):
+        name = arg.undefault(name, self.get_default_instance_name())
+        if fx.is_flux(flux):
+            flux_object = flux
+        else:
+            flux_class = fx.get_class(flux)
+            flux_object = flux_class(
+                context=self,
+                **kwargs
+            ).fill_meta(
+                check=check,
+                **self.flux_config
+            )
         self.flux_instances[name] = flux_object
         if check:
             if hasattr(flux_object, 'check'):
