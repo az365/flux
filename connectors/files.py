@@ -70,13 +70,17 @@ class LocalFolder:
     def get_path(self):
         return self.path
 
-    def file(self, name, filetype=None, **kwargs):
+    def file(self, name, filetype=AUTO, **kwargs):
         file = self.files.get(name)
         if file:
             assert not kwargs, 'file connection {} is already registered'.format(name)
         else:
+            filename = kwargs.get('filename', name)
+            file_ext = filename.split('.')[-1]
+            supposed_type = cs.DICT_EXT_TO_TYPE.get(file_ext, cs.ConnType.TextFile)
+            filetype = arg.undefault(filetype, supposed_type)
             file_class = cs.get_class(filetype)
-            file = file_class(name, folder=self, **kwargs)
+            file = file_class(filename, folder=self, **kwargs)
             self.files[name] = file
         return file
 
@@ -115,7 +119,7 @@ class AbstractFile(ABC):
             filename,
             folder=None,
             context=None,
-            verbose=AUTO
+            verbose=AUTO,
     ):
         self.filename = filename
         self.fileholder = None
@@ -239,7 +243,7 @@ class TextFile(AbstractFile):
             filename=filename,
             folder=folder,
             context=context,
-            verbose=verbose
+            verbose=verbose,
         )
         self.gzip = gzip
         self.encoding = encoding
@@ -259,7 +263,7 @@ class TextFile(AbstractFile):
             params = dict()
             if self.encoding:
                 params['encoding'] = self.encoding
-            self.fileholder = open(self.filename, mode, **params) if self.encoding else open(self.filename, 'r')
+            self.fileholder = open(self.get_path(), mode, **params) if self.encoding else open(self.filename, 'r')
 
     def count_lines(self, reopen=False, chunk_size=CHUNK_SIZE, verbose=AUTO):
         verbose = arg.undefault(verbose, self.verbose)
@@ -271,7 +275,7 @@ class TextFile(AbstractFile):
         self.log('Detected {} lines in {}.'.format(self.count, self.filename), end='\r', verbose=verbose)
         return self.count
 
-    def get_count(self, reopen=False):
+    def get_count(self, reopen=True):
         if (self.count is None or self.count == AUTO) and not self.gzip:
             self.count = self.count_lines(reopen=reopen)
         return self.count
@@ -458,7 +462,7 @@ class CsvFile(TextFile):
             verbose=verbose, step=step,
         )
         rows = csv.reader(lines, delimiter=self.delimiter) if self.delimiter else csv.reader(lines)
-        if self.schema is not None or not convert_types:
+        if self.schema is None or not convert_types:
             yield from rows
         else:
             converters = self.get_schema().get_converters('str', 'py')
