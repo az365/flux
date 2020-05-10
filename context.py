@@ -102,29 +102,45 @@ class FluxContext:
     def get_tmp_folder(self):
         return self.conn_instances.get('tmp')
 
-    def close_conn(self, name, recursively=False):
+    def close_conn(self, name, recursively=False, verbose=True):
+        closed_count = 0
         this_conn = self.conn_instances[name]
+        closed_count += this_conn.close() or 0
         this_conn.close()
         if recursively and hasattr(this_conn, 'get_links'):
             for link in this_conn.get_links():
-                link.close()
+                closed_count += link.close() or 0
+        if verbose:
+            self.log('{} connection(s) closed.'.format(closed_count))
+        else:
+            return closed_count
 
-    def close_flux(self, name, recursively=False):
+    def close_flux(self, name, recursively=False, verbose=True):
         this_flux = self.flux_instances[name]
-        this_flux.close()
+        closed_fluxes, closed_links = this_flux.close() or 0
         if recursively and hasattr(this_flux, 'get_links'):
             for link in this_flux.get_links():
-                link.close()
+                closed_links += link.close() or 0
+        if verbose:
+            self.log('{} flux(es) and {} link(s) closed.'.format(closed_fluxes, closed_links))
+        else:
+            return closed_fluxes, closed_links
 
-    def leave_conn(self, name, recursively=True):
-        self.close_conn(name, recursively=recursively)
-        self.conn_instances.pop(name)
-        gc.collect()
+    def leave_conn(self, name, recursively=True, verbose=True):
+        if name in self.conn_instances:
+            self.close_conn(name, recursively=recursively, verbose=verbose)
+            self.conn_instances.pop(name)
+            gc.collect()
+            if not verbose:
+                return 1
 
-    def leave_flux(self, name, recursively=True):
-        self.close_flux(name, recursively=recursively)
-        self.flux_instances.pop(name)
-        gc.collect()
+    def leave_flux(self, name, recursively=True, verbose=True):
+        if name in self.flux_instances:
+            self.close_flux(name, recursively=recursively, verbose=verbose)
+            self.flux_instances.pop(name)
+            gc.collect()
+            if not verbose:
+                return 1
 
     @staticmethod
     def flux_classes():

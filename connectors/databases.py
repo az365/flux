@@ -70,6 +70,17 @@ class AbstractDatabase(ABC):
             self.tables[name] = table
         return table
 
+    def close(self):
+        if hasattr(self, 'disconnect'):
+            return self.disconnect()
+
+    def get_items(self):
+        return self.tables
+
+    def get_links(self):
+        for item in self.get_items():
+            yield from item.get_links()
+
     @classmethod
     def need_connection(cls):
         return hasattr(cls, 'connection')
@@ -341,6 +352,7 @@ class PostgresDatabase(AbstractDatabase):
             else:
                 self.connection.close()
             self.connection = None
+            return 1
 
     def execute(self, query=TEST_QUERY, get_data=AUTO, commit=AUTO, data=None, verbose=arg.DEFAULT):
         verbose = arg.undefault(verbose, self.verbose)
@@ -557,6 +569,9 @@ class Table:
             msg=msg, level=level,
             end=end, verbose=verbose,
         )
+
+    def get_name(self):
+        return self.name
 
     def get_data(self, verbose=arg.DEFAULT):
         return self.database.select_all(self.name, verbose=verbose)
