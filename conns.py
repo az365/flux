@@ -36,8 +36,9 @@ CONN_CLASSES = (
     AbstractDatabase, Table,
     PostgresDatabase, ClickhouseDatabase,
     LocalFolder, AbstractFile,
-    TextFile, JsonFile, CsvFile,
+    TextFile, JsonFile, CsvFile, TsvFile,
 )
+DICT_EXT_TO_TYPE = {'txt': TextFile, 'json': JsonFile, 'csv': CsvFile, 'tsv': TsvFile}
 
 
 class ConnType(Enum):
@@ -52,7 +53,9 @@ class ConnType(Enum):
 
 
 def get_class(conn_type):
-    if isinstance(conn_type, str):
+    if conn_type in CONN_CLASSES:
+        return conn_type
+    elif isinstance(conn_type, str):
         conn_type = ConnType(conn_type)
     message = 'conn_type must be an instance of ConnType (but {} as type {} received)'
     assert isinstance(conn_type, ConnType), TypeError(message.format(conn_type, type(conn_type)))
