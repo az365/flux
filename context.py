@@ -142,6 +142,51 @@ class FluxContext:
             if not verbose:
                 return 1
 
+    def close_all_conns(self, recursively=False, verbose=True):
+        closed_count = 0
+        for name in self.conn_instances:
+            closed_count += self.close_conn(name, recursively=recursively, verbose=False)
+        if verbose:
+            self.log('{} connection(s) closed'.format(closed_count))
+        else:
+            return closed_count
+
+    def close_all_fluxes(self, recursively=False, verbose=True):
+        closed_fluxes, closed_links = 0, 0
+        for name in self.flux_instances:
+            closed_fluxes, closed_links = self.close_flux(name, recursively=recursively)
+        if verbose:
+            self.log('{} flux(es) and link(s) closed.'.format(closed_fluxes, closed_links))
+        else:
+            return closed_fluxes, closed_links
+
+    def close_all(self, verbose=True):
+        closed_conns = self.close_all_conns(recursively=True, verbose=False)
+        closed_fluxes, closed_links = self.close_all_fluxes(recursively=True, verbose=False)
+        if verbose:
+            self.log('{} conn(s), {} flux(es), {} link(s) closed.'.format(closed_conns, closed_fluxes, closed_links))
+        else:
+            return closed_conns, closed_fluxes, closed_links
+
+    def leave_all_conns(self, recursively=False):
+        closed_count = self.close_all_conns(verbose=False)
+        left_count = 0
+        for name in self.conn_instances.copy():
+            left_count += self.leave_conn(name, recursively=recursively, verbose=False)
+        self.log('{} connection(s) closed, {} connection(s) left.'.format(closed_count, left_count))
+
+    def leave_all_fluxes(self, recursively=False, verbose=True):
+        closed_fluxes, closed_links = self.close_all_fluxes(verbose=False)
+        left_count = 0
+        for name in self.flux_instances.copy():
+            left_count += self.leave_flux(name, recursively=recursively, verbose=False)
+        self.log('{} flux(es) and {} link(s) closed, {} flux(es) left'.format(closed_fluxes, closed_links, left_count))
+
+    def leave_all(self):
+        self.close_all(verbose=True)
+        self.leave_all_conns(recursively=True)
+        self.leave_all_fluxes(recursively=True)
+
     @staticmethod
     def flux_classes():
         return fx
