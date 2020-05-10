@@ -82,7 +82,10 @@ class FluxContext:
     def flux(self, flux, name=arg.DEFAULT, check=True, **kwargs):
         name = arg.undefault(name, self.get_default_instance_name())
         if fx.is_flux(flux):
-            flux_object = flux
+            flux_object = flux.fill_meta(
+                context=self,
+                **self.flux_config
+            )
         else:
             flux_class = fx.get_class(flux)
             flux_object = flux_class(
