@@ -4,6 +4,7 @@ import gzip as gz
 import csv
 
 try:  # Assume we're a sub-module in a package.
+    import context as fc
     import fluxes as fx
     import conns as cs
     from utils import (
@@ -14,6 +15,7 @@ try:  # Assume we're a sub-module in a package.
         log_progress,
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
+    from .. import context as fc
     from .. import fluxes as fx
     from .. import conns as cs
     from ..utils import (
@@ -41,10 +43,12 @@ class LocalFolder:
             self,
             path,
             context=None,
+            verbose=True,
     ):
         self.path = path
         self.files = dict()
         self.context = context
+        self.verbose = verbose
 
     def get_context(self):
         return self.context
@@ -109,14 +113,22 @@ class AbstractFile(ABC):
             self,
             filename,
             folder=None,
+            context=None,
+            verbose=AUTO
     ):
         self.filename = filename
         self.fileholder = None
         if folder:
-            assert isinstance(folder, LocalFolder), 'only LocalFolder supported for *File instances'
+            message = 'only LocalFolder supported for *File instances (got {})'.format(type(folder))
+            assert isinstance(folder, LocalFolder), message
             self.folder = folder
+        elif context:
+            assert isinstance(context, fc.FluxContext)
+            self.folder = context.get_job_folder()
+            self.folder.add_file(filename, self)
         else:
             self.folder = None
+        self.verbose = arg.undefault(verbose, self.folder.verbose if self.folder else True)
         self.links = list()
 
     def get_context(self):
@@ -217,18 +229,20 @@ class TextFile(AbstractFile):
             end='\n',
             expected_count=AUTO,
             folder=None,
+            context=None,
             verbose=AUTO,
     ):
         super().__init__(
             filename=filename,
             folder=folder,
+            context=context,
+            verbose=verbose
         )
         self.gzip = gzip
         self.encoding = encoding
         self.end = end
         self.count = expected_count
         self.fileholder = None
-        self.verbose = arg.undefault(verbose, self.folder.verbose if self.folder else True)
 
     def open(self, mode='r', reopen=False):
         if self.is_opened():
@@ -282,7 +296,8 @@ class TextFile(AbstractFile):
 
     def get_items(self, verbose=AUTO, step=AUTO):
         verbose = arg.undefault(verbose, self.verbose)
-        self.log('Expecting {} lines in file {}...'.format(self.get_count(), self.get_name()), verbose=verbose)
+        if (self.get_count() or 0) > 0:
+            self.log('Expecting {} lines in file {}...'.format(self.get_count(), self.get_name()), verbose=verbose)
         return self.get_lines(verbose=verbose, step=step)
 
     @staticmethod
@@ -333,6 +348,8 @@ class JsonFile(TextFile):
             schema=AUTO,
             default_value=None,
             folder=None,
+            context=None,
+            verbose=AUTO,
     ):
         super().__init__(
             filename=filename,
@@ -340,6 +357,8 @@ class JsonFile(TextFile):
             gzip=gzip,
             expected_count=expected_count,
             folder=folder,
+            context=context,
+            verbose=verbose,
         )
         self.schema = schema
         self.default_value = default_value
@@ -374,6 +393,9 @@ class CsvFile(TextFile):
             first_line_is_title=True,
             expected_count=AUTO,
             schema=AUTO,
+            folder=None,
+            context=None,
+            verbose=AUTO
     ):
         super().__init__(
             filename=filename,
@@ -381,6 +403,9 @@ class CsvFile(TextFile):
             encoding=encoding,
             end=end,
             expected_count=expected_count,
+            folder=folder,
+            context=context,
+            verbose=verbose,
         )
         self.delimiter = delimiter
         self.first_line_is_title = first_line_is_title
