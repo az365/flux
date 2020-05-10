@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 import requests
 import psycopg2
 
@@ -8,7 +9,7 @@ try:  # Assume we're a sub-module in a package.
         arguments as arg,
         functions as fs,
         mappers as ms,
-        log_progress as log,
+        log_progress,
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
@@ -16,7 +17,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
         arguments as arg,
         functions as fs,
         mappers as ms,
-        log_progress as log,
+        log_progress,
     )
 
 
@@ -25,6 +26,12 @@ COMMON_PROPS = ['verbose', ]
 TEST_QUERY = 'SELECT now()'
 DEFAULT_GROUP = 'PUBLIC'
 DEFAULT_STEP = 1000
+
+
+class DatabaseType(Enum):
+    MysqlDatabase = 'MysqlDatabase'
+    PostgresDatabase = 'PostgresDatabase'
+    ClickhouseDatabase = 'ClickhouseDatabase'
 
 
 class AbstractDatabase(ABC):
@@ -51,14 +58,15 @@ class AbstractDatabase(ABC):
         if self.context is not None:
             return self.context.get_logger()
         else:
-            return log.get_logger()
+            return log_progress.get_logger()
 
     def log(self, msg, level=arg.DEFAULT, end=arg.DEFAULT, verbose=True):
-        log.log(
-            logger=self.get_logger(),
-            msg=msg, level=level,
-            end=end, verbose=verbose,
-        )
+        logger = self.get_logger()
+        if logger is not None:
+            logger.log(
+                msg=msg, level=level,
+                end=end, verbose=verbose,
+            )
 
     def table(self, name, schema=None, **kwargs):
         table = self.tables.get(name)
@@ -293,8 +301,8 @@ class AbstractDatabase(ABC):
             skip_lines=0, skip_first_line=False, max_error_rate=0.0,
             verbose=arg.DEFAULT,
     ):
-        tmp_name = table + '_tmp_upload'
-        bak_name = table + '_bak'
+        tmp_name = '{}_tmp_upload'.format(table)
+        bak_name = '{}_bak'.format(table)
         verbose = arg.undefault(verbose, self.verbose)
         self.force_upload_table(
             table=tmp_name, schema=schema, data=data, encoding=encoding, skip_first_line=skip_first_line,
@@ -348,7 +356,7 @@ class PostgresDatabase(AbstractDatabase):
                     self.connection.close()
                 except psycopg2.OperationalError:
                     message = 'Connection to {} already closed.'.format(self.host)
-                    self.log(message, level=log.LoggingLevel.Warning, verbose=verbose)
+                    self.log(message, level=log_progress.LoggingLevel.Warning, verbose=verbose)
             else:
                 self.connection.close()
             self.connection = None
@@ -357,7 +365,8 @@ class PostgresDatabase(AbstractDatabase):
     def execute(self, query=TEST_QUERY, get_data=AUTO, commit=AUTO, data=None, verbose=arg.DEFAULT):
         verbose = arg.undefault(verbose, self.verbose)
         message = verbose if isinstance(verbose, str) else 'Execute:'
-        self.log([message, ms.remove_extra_spaces(query)], level=log.LoggingLevel.Debug, end='\r', verbose=verbose)
+        level = log_progress.LoggingLevel.Debug
+        self.log([message, ms.remove_extra_spaces(query)], level=level, end='\r', verbose=verbose)
         if get_data == AUTO:
             if 'SELECT' in query and 'GRANT' not in query:
                 get_data, commit = True, False
@@ -426,7 +435,9 @@ class PostgresDatabase(AbstractDatabase):
             values=', '.join(placeholders),
         )
         message = verbose if isinstance(verbose, str) else 'Committing {}-rows batches into {}'.format(step, table)
-        progress = log.Progress(message, count=count, verbose=verbose, logger=self.get_logger(), context=self.context)
+        progress = self.get_logger().Progress(
+            message, count=count, verbose=verbose, logger=self.get_logger(), context=self.context
+        )
         progress.start()
         n = 0
         for n, row in enumerate(rows):
@@ -434,8 +445,8 @@ class PostgresDatabase(AbstractDatabase):
                 try:
                     cur.execute(query, row)
                 except TypeError or IndexError as e:  # TypeError: not all arguments converted during string formatting
-                    self.log(['Error line:', str(row)], level=log.LoggingLevel.Debug, verbose=verbose)
-                    self.log([e.__class__.__name__, e], level=log.LoggingLevel.Error)
+                    self.log(['Error line:', str(row)], level=log_progress.LoggingLevel.Debug, verbose=verbose)
+                    self.log([e.__class__.__name__, e], level=log_progress.LoggingLevel.Error)
             else:
                 cur.execute(query, row)
             if (n + 1) % step == 0:
@@ -519,7 +530,9 @@ class ClickhouseDatabase(AbstractDatabase):
             values='{}',
         )
         message = verbose if isinstance(verbose, str) else 'Inserting into {table}'.format(table=table)
-        progress = log.Progress(message, count=count, verbose=verbose, logger=self.get_logger(), context=self.context)
+        progress = log_progress.Progress(
+            message, count=count, verbose=verbose, logger=self.get_logger(), context=self.context,
+        )
         progress.start()
         n = 0
         for n, row in enumerate(rows):
@@ -529,8 +542,8 @@ class ClickhouseDatabase(AbstractDatabase):
                 try:
                     self.execute(cur_query)
                 except requests.RequestException as e:
-                    self.log(['Error line:', str(row)], level=log.LoggingLevel.Debug, verbose=verbose)
-                    self.log([e.__class__.__name__, e], level=log.LoggingLevel.Error)
+                    self.log(['Error line:', str(row)], level=log_progress.LoggingLevel.Debug, verbose=verbose)
+                    self.log([e.__class__.__name__, e], level=log_progress.LoggingLevel.Error)
             else:
                 self.execute(cur_query)
             if (n + 1) % step == 0:
@@ -555,8 +568,9 @@ class Table:
         assert isinstance(database, AbstractDatabase)
         self.database = database
         if reconnect:
-            if hasattr(self.database,'connect'):
+            if hasattr(self.database, 'connect'):
                 self.database.connect(reconnect=True)
+        self.links = list()
 
     def get_context(self):
         return self.database.get_context()
@@ -570,14 +584,25 @@ class Table:
             end=end, verbose=verbose,
         )
 
+    def get_count(self, verbose=arg.DEFAULT):
+        return self.database.select_count(self.name, verbose=verbose)
+
     def get_name(self):
         return self.name
 
     def get_data(self, verbose=arg.DEFAULT):
         return self.database.select_all(self.name, verbose=verbose)
 
-    def get_count(self, verbose=arg.DEFAULT):
-        return self.database.select_count(self.name, verbose=verbose)
+    def get_flux(self):
+        count = self.get_count()
+        flux = fx.RowsFlux(
+            self.get_data(),
+            count=count,
+            # source=self,
+            context=self.get_context(),
+        )
+        self.links.append(flux)
+        return flux
 
     def create(self, drop_if_exists, verbose=arg.DEFAULT):
         return self.database.create_table(
