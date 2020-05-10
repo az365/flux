@@ -31,21 +31,30 @@ def any_to_bool(value):
         return bool(value)
 
 
+def safe_converter(converter, default_value=0):
+    def func(value):
+        try:
+            return converter(value)
+        except ValueError:
+            return default_value
+    return func
+
+
 DIALECTS = ('str', 'py', 'pg', 'ch')
 FIELD_TYPES = {
-    FieldType.Any: dict(py=str, pg='text', ch='String', str_to_py=str),
-    FieldType.Json: dict(py=dict, pg='text', ch='String', str_to_py=json.loads, py_to_str=json.dumps),
-    FieldType.Str: dict(py=str, pg='text', ch='String', str_to_py=str),
-    FieldType.Str16: dict(py=str, pg='varchar(16)', ch='FixedString(16)', str_to_py=str),
-    FieldType.Str64: dict(py=str, pg='varchar(64)', ch='FixedString(64)', str_to_py=str),
-    FieldType.Str256: dict(py=str, pg='varchar(256)', ch='FixedString(256)', str_to_py=str),
-    FieldType.Int: dict(py=int, pg='int', ch='Int32', str_to_py=int),
-    FieldType.Float: dict(py=float, pg='numeric', ch='Float32', str_to_py=int),
-    FieldType.IsoDate: dict(py=date, pg='date', ch='Date', str_to_py=date.fromisoformat),
-    FieldType.IsoTime: dict(py=date, pg='time', str_to_py=time.fromisoformat),
-    FieldType.IsoDatetime: dict(py=date, pg='timestamp', ch='Datetime', str_to_py=datetime.fromisoformat),
-    FieldType.Bool: dict(py=bool, pg='bool', ch='UInt8', str_to_py=any_to_bool, py_to_ch=int),
-    FieldType.Tuple: dict(py=tuple, pg='text', str_to_py=eval),
+    FieldType.Any.value: dict(py=str, pg='text', ch='String', str_to_py=str),
+    FieldType.Json.value: dict(py=dict, pg='text', ch='String', str_to_py=json.loads, py_to_str=json.dumps),
+    FieldType.Str.value: dict(py=str, pg='text', ch='String', str_to_py=str),
+    FieldType.Str16.value: dict(py=str, pg='varchar(16)', ch='FixedString(16)', str_to_py=str),
+    FieldType.Str64.value: dict(py=str, pg='varchar(64)', ch='FixedString(64)', str_to_py=str),
+    FieldType.Str256.value: dict(py=str, pg='varchar(256)', ch='FixedString(256)', str_to_py=str),
+    FieldType.Int.value: dict(py=int, pg='int', ch='Int32', str_to_py=safe_converter(int)),
+    FieldType.Float.value: dict(py=float, pg='numeric', ch='Float32', str_to_py=safe_converter(float)),
+    FieldType.IsoDate.value: dict(py=date, pg='date', ch='Date', str_to_py=date.fromisoformat),
+    FieldType.IsoTime.value: dict(py=date, pg='time', str_to_py=time.fromisoformat),
+    FieldType.IsoDatetime.value: dict(py=date, pg='timestamp', ch='Datetime', str_to_py=datetime.fromisoformat),
+    FieldType.Bool.value: dict(py=bool, pg='bool', ch='UInt8', str_to_py=any_to_bool, py_to_ch=safe_converter(int)),
+    FieldType.Tuple.value: dict(py=tuple, pg='text', str_to_py=eval),
 }
 AGGR_HINTS = (None, 'id', 'cat', 'measure')
 
@@ -56,10 +65,10 @@ def get_canonic_type(field_type, ignore_absent=False):
     elif field_type in FieldType.__dict__.values():
         return FieldType(field_type)
     else:
-        for canonic_type, dict_names in sorted(FIELD_TYPES.items(), key=lambda i: i[0].value, reverse=True):
+        for canonic_type, dict_names in sorted(FIELD_TYPES.items(), key=lambda i: i[0], reverse=True):
             for dialect, type_name in dict_names.items():
                 if field_type == type_name:
-                    return canonic_type
+                    return FieldType(canonic_type)
     if not ignore_absent:
         raise ValueError('Unsupported field type: {}'.format(field_type))
 
@@ -71,9 +80,13 @@ def get_dialect_for_conn_type(db_obj):
         db_class = cs.get_class(db_obj)
     elif isinstance(db_obj, str):
         db_class = (cs.get_class(cs.ConnType(db_obj)))
+    elif db_obj is None:
+        db_class = None
     else:
         raise ValueError
-    if db_class == cs.PostgresDatabase:
+    if db_class is None:
+        return 'py'
+    elif db_class == cs.PostgresDatabase:
         return 'pg'
     elif db_class == cs.ClickhouseDatabase:
         return 'ch'
@@ -97,12 +110,15 @@ class FieldDescription:
         self.aggr_hint = aggr_hint
 
     def get_type_in(self, dialect):
-        assert dialect in DIALECTS
-        return FIELD_TYPES.get(self.field_type, {}).get(dialect)
+        if dialect is None:
+            return self.field_type.value
+        else:
+            assert dialect in DIALECTS
+            return FIELD_TYPES.get(self.field_type.value, {}).get(dialect)
 
     def get_converter(self, source, target):
         converter_name = '{}_to_{}'.format(source, target)
-        return FIELD_TYPES.get(self.field_type, {}).get(converter_name, str)
+        return FIELD_TYPES.get(self.field_type.value, {}).get(converter_name, str)
 
     def check_value(self, value):
         py_type = self.get_type_in('py')
@@ -171,12 +187,16 @@ class SchemaRow:
 
     def set_data(self, row, check=True):
         if check:
-            assert isinstance(row, (list, tuple))
-            assert len(row) == self.schema.get_fields_count()
+            assert isinstance(row, (list, tuple)), 'Row must be list or tuple (got {})'.format(type(row))
+            expected_fields_count = self.schema.get_fields_count()
+            assert len(row) == expected_fields_count, 'count of cells must match the schema ({} != {})'.format(
+                len(row), expected_fields_count,
+            )
             schematized_fields = list()
             for value, desc in zip(row, self.schema.fields_descriptions):
                 if not desc.check_value(value):
-                    value = desc.get_converter('str', 'py')
+                    converter = desc.get_converter('str', 'py')
+                    value = converter(value)
                 schematized_fields.append(value)
             self.data = schematized_fields
         else:
