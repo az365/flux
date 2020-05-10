@@ -444,3 +444,33 @@ class CsvFile(TextFile):
     def get_records(self):
         for item in self.get_schema_rows():
             yield item.get_record()
+
+
+class TsvFile(CsvFile):
+    def __init__(
+            self,
+            filename,
+            gzip=False,
+            encoding='utf8',
+            end='\n',
+            delimiter='\t',
+            first_line_is_title=True,
+            expected_count=AUTO,
+            schema=AUTO,
+            folder=None,
+            context=None,
+            verbose=AUTO
+    ):
+        super().__init__(
+            filename=filename,
+            gzip=gzip,
+            encoding=encoding,
+            end=end,
+            delimiter=delimiter,
+            first_line_is_title=first_line_is_title,
+            expected_count=expected_count,
+            schema=schema,
+            folder=folder,
+            context=context,
+            verbose=verbose,
+        )

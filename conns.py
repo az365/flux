@@ -5,8 +5,9 @@ try:  # Assume we're a sub-module in a package.
         LocalFolder,
         AbstractFile,
         TextFile,
-        CsvFile,
         JsonFile,
+        CsvFile,
+        TsvFile,
     )
     from connectors.databases import (
         AbstractDatabase,
@@ -19,8 +20,9 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
         LocalFolder,
         AbstractFile,
         TextFile,
-        CsvFile,
         JsonFile,
+        CsvFile,
+        TsvFile,
     )
     from .connectors.databases import (
         AbstractDatabase,
@@ -43,6 +45,7 @@ class ConnType(Enum):
     TextFile = 'TextFile'
     JsonFile = 'JsonFile'
     CsvFile = 'CsvFile'
+    TsvFile = 'TsvFile'
     PostgresDatabase = 'PostgresDatabase'
     ClickhouseDatabase = 'ClickhouseDatabase'
     Table = 'Table'
@@ -61,6 +64,8 @@ def get_class(conn_type):
         return JsonFile
     elif conn_type == ConnType.CsvFile:
         return CsvFile
+    elif conn_type == ConnType.TsvFile:
+        return CsvFile
     elif conn_type == ConnType.PostgresDatabase:
         return PostgresDatabase
     elif conn_type == ConnType.ClickhouseDatabase:
@@ -74,4 +79,4 @@ def is_conn(obj):
 
 
 def is_file(obj):
-    return isinstance(obj, (TextFile, JsonFile, CsvFile))
+    return isinstance(obj, (TextFile, JsonFile, CsvFile, TsvFile))
