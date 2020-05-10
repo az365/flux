@@ -96,9 +96,6 @@ class FluxContext:
                 **self.flux_config
             )
         self.flux_instances[name] = flux_object
-        if check:
-            if hasattr(flux_object, 'check'):
-                flux_object.check()
         return flux_object
 
     def get(self, name, deep=True):
