@@ -57,8 +57,10 @@ class AnyFlux:
         return self.context
 
     def put_into_context(self, name=arg.DEFAULT):
+        assert self.context, 'for put_into_context context must be defined'
         name = arg.undefault(name, self.name)
-        self.context.flux(self, name=name)
+        if name not in self.context.flux_instances:
+            self.context.flux_instances[name] = self
 
     def get_name(self):
         return self.name
