@@ -72,6 +72,8 @@ class FluxContext:
             else:
                 return conn_object
         if cs.is_conn(conn):
+            conn_object = conn
+        else:
             conn_class = cs.get_class(conn)
             conn_object = conn_class(context=self, **kwargs)
         self.conn_instances[name] = conn_object
@@ -88,7 +90,7 @@ class FluxContext:
             flux_object = flux_class(**kwargs)
         flux_object = flux_object.set_name(
             name,
-            registe=False
+            register=False,
         ).fill_meta(
             context=self,
             check=check,
@@ -109,7 +111,7 @@ class FluxContext:
                         return c.get_items()[name]
 
     def rename_flux(self, old_name, new_name):
-        assert old_name in self.flux_instances, 'Flux must be defined (name {} is not registred)'.format(old_name)
+        assert old_name in self.flux_instances, 'Flux must be defined (name {} is not registered)'.format(old_name)
         if new_name != old_name:
             self.flux_instances[new_name] = self.flux_instances.pop(old_name)
 
@@ -138,7 +140,6 @@ class FluxContext:
         closed_count = 0
         this_conn = self.conn_instances[name]
         closed_count += this_conn.close() or 0
-        this_conn.close()
         if recursively and hasattr(this_conn, 'get_links'):
             for link in this_conn.get_links():
                 closed_count += link.close() or 0
@@ -179,7 +180,7 @@ class FluxContext:
         for name in self.conn_instances:
             closed_count += self.close_conn(name, recursively=recursively, verbose=False)
         if verbose:
-            self.log('{} connection(s) closed'.format(closed_count))
+            self.log('{} connection(s) closed.'.format(closed_count))
         else:
             return closed_count
 
@@ -188,7 +189,7 @@ class FluxContext:
         for name in self.flux_instances:
             closed_fluxes, closed_links = self.close_flux(name, recursively=recursively)
         if verbose:
-            self.log('{} flux(es) and link(s) closed.'.format(closed_fluxes, closed_links))
+            self.log('{} flux(es) and {} link(s) closed.'.format(closed_fluxes, closed_links))
         else:
             return closed_fluxes, closed_links
 
@@ -207,7 +208,7 @@ class FluxContext:
             left_count += self.leave_conn(name, recursively=recursively, verbose=False)
         self.log('{} connection(s) closed, {} connection(s) left.'.format(closed_count, left_count))
 
-    def leave_all_fluxes(self, recursively=False, verbose=True):
+    def leave_all_fluxes(self, recursively=False):
         closed_fluxes, closed_links = self.close_all_fluxes(verbose=False)
         left_count = 0
         for name in self.flux_instances.copy():
