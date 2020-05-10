@@ -75,7 +75,7 @@ class LocalFolder:
         if file:
             assert not kwargs, 'file connection {} is already registered'.format(name)
         else:
-            filename = kwargs.get('filename', name)
+            filename = kwargs.pop('filename', name)
             file_ext = filename.split('.')[-1]
             supposed_type = cs.DICT_EXT_TO_TYPE.get(file_ext, cs.ConnType.TextFile)
             filetype = arg.undefault(filetype, supposed_type)
