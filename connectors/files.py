@@ -76,6 +76,11 @@ class LocalFolder:
             self.files[name] = file
         return file
 
+    def add_file(self, name, file):
+        assert cs.is_file(file), 'file must be an instance of *File (got {})'.format(type(file))
+        assert name not in self.files, 'file with name {} is already registered'.format(name)
+        self.files[name] = file
+
     def get_items(self):
         return self.files
 
@@ -84,13 +89,20 @@ class LocalFolder:
             yield from item.get_links()
 
     def close(self, name=None):
+        closed_count = 0
         if name:
             file = self.files.get(name)
             if file:
-                file.close()
-        for file in self.files:
-            file.close()
+                closed_count += file.close()
+        else:
+            for file in self.files.values():
+                closed_count += file.close()
+        return closed_count
 
+    def get_meta(self):
+        meta = self.__dict__.copy()
+        meta.pop('files')
+        return meta
 
 class AbstractFile(ABC):
     def __init__(
@@ -127,6 +139,11 @@ class AbstractFile(ABC):
 
     def get_links(self):
         return self.links
+
+    def add_to_folder(self, folder, name=arg.DEFAULT):
+        assert isinstance(folder, LocalFolder), 'Folder must be a LocalFolder (got {})'.format(type(folder))
+        name = arg.undefault(name, self.filename)
+        folder.add_file(self, name)
 
     @staticmethod
     def get_flux_type():
@@ -174,6 +191,7 @@ class AbstractFile(ABC):
     def close(self):
         if self.is_opened():
             self.fileholder.close()
+            return 1
 
     def open(self, mode='r', reopen=False):
         if self.is_opened():
@@ -183,6 +201,11 @@ class AbstractFile(ABC):
                 raise AttributeError('File {} is already opened'.format(self.filename))
         else:
             self.fileholder = open(self.filename, 'r')
+
+    def get_meta(self):
+        meta = self.__dict__.copy()
+        meta.pop('fileholder')
+        return meta
 
 
 class TextFile(AbstractFile):

@@ -71,3 +71,7 @@ def get_class(conn_type):
 
 def is_conn(obj):
     return isinstance(obj, CONN_CLASSES)
+
+
+def is_file(obj):
+    return isinstance(obj, (TextFile, JsonFile, CsvFile))
