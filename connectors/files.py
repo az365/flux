@@ -180,8 +180,10 @@ class AbstractFile(ABC):
                 return folder_path.format(self.filename)
             elif folder_path.endswith('/'):
                 return folder_path + self.filename
-            else:
+            elif folder_path:
                 return '{}/{}'.format(folder_path, self.filename)
+            else:
+                return self.filename
 
     def get_list_path(self):
         return self.get_path().split('/')
@@ -268,14 +270,16 @@ class TextFile(AbstractFile):
         self.log('Detected {} lines in {}.'.format(self.count, self.filename), end='\r', verbose=verbose)
         return self.count
 
-    def get_count(self):
+    def get_count(self, reopen=False):
         if (self.count is None or self.count == AUTO) and not self.gzip:
-            self.count = self.count_lines()
+            self.count = self.count_lines(reopen=reopen)
         return self.count
 
-    def get_next_lines(self, count=None, close=False):
+    def get_next_lines(self, count=None, skip_first=False, close=False):
         assert self.is_opened()
         for n, row in enumerate(self.fileholder):
+            if skip_first and n == 0:
+                continue
             if isinstance(row, bytes):
                 row = row.decode(self.encoding) if self.encoding else row.decode()
             if self.end:
@@ -286,9 +290,11 @@ class TextFile(AbstractFile):
         if close:
             self.close()
 
-    def get_lines(self, count=None, verbose=AUTO, step=AUTO):
+    def get_lines(self, count=None, skip_first=False, check=True, verbose=AUTO, step=AUTO):
+        if check and not self.gzip:
+            assert self.get_count(reopen=True) > 0
         self.open(reopen=True)
-        lines = self.get_next_lines(count=count, close=True)
+        lines = self.get_next_lines(count=count, skip_first=skip_first, close=True)
         if arg.undefault(verbose, self.verbose):
             message = 'Reading {}'.format(self.get_name())
             lines = self.get_logger().progress(lines, name=message, count=self.count, step=step)
@@ -314,8 +320,8 @@ class TextFile(AbstractFile):
     def flux_kwargs(self, verbose=AUTO, step=AUTO, **kwargs):
         verbose = arg.undefault(verbose, self.verbose)
         result = dict(
+            count=self.get_count(),
             data=self.get_items(verbose=verbose, step=step),
-            count=self.count,
             source=self,
             context=self.get_context(),
         )
@@ -389,7 +395,7 @@ class CsvFile(TextFile):
             gzip=False,
             encoding='utf8',
             end='\n',
-            delimiter='\t',
+            delimiter=',',
             first_line_is_title=True,
             expected_count=AUTO,
             schema=AUTO,
