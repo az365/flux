@@ -101,10 +101,10 @@ class LocalFolder:
         if name:
             file = self.files.get(name)
             if file:
-                closed_count += file.close()
+                closed_count += file.close() or 0
         else:
             for file in self.files.values():
-                closed_count += file.close()
+                closed_count += file.close() or 0
         return closed_count
 
     def get_meta(self):
@@ -125,7 +125,7 @@ class AbstractFile(ABC):
         self.fileholder = None
         if folder:
             message = 'only LocalFolder supported for *File instances (got {})'.format(type(folder))
-            assert isinstance(folder, LocalFolder), message
+            assert cs.is_folder(), message
             self.folder = folder
         elif context:
             assert isinstance(context, fc.FluxContext)
@@ -205,7 +205,10 @@ class AbstractFile(ABC):
         return self.get_list_path()[-1]
 
     def is_opened(self):
-        return self.fileholder is not None
+        if self.fileholder is None:
+            return False
+        else:
+            return self.fileholder is not None
 
     def close(self):
         if self.is_opened():
@@ -322,6 +325,17 @@ class TextFile(AbstractFile):
             verbose=verbose,
         )
 
+    def lines_flux_kwargs(self, verbose=AUTO, step=AUTO, **kwargs):
+        verbose = arg.undefault(verbose, self.verbose)
+        result = dict(
+            count=self.get_count(),
+            data=self.get_lines(verbose=verbose, step=step),
+            source=self,
+            context=self.get_context(),
+        )
+        result.update(kwargs)
+        return result
+
     def flux_kwargs(self, verbose=AUTO, step=AUTO, **kwargs):
         verbose = arg.undefault(verbose, self.verbose)
         result = dict(
@@ -340,7 +354,7 @@ class TextFile(AbstractFile):
 
     def to_lines_flux(self, **kwargs):
         return fx.LinesFlux(
-            **self.flux_kwargs(**kwargs)
+            **self.lines_flux_kwargs(**kwargs)
         )
 
     def to_any_flux(self, **kwargs):
