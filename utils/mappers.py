@@ -160,3 +160,23 @@ def items_to_dict(items, key_function, value_function=None, of_lists=False):
         else:
             result[k] = v
     return result
+
+
+def fold_lists(list_records, key_fields, list_fields):
+    rec_out = dict()
+    for f in key_fields:
+        rec_out[f] = list_records[0].get(f)
+    for f in list_fields:
+        rec_out[f] = [r.get(f) for r in list_records]
+    return rec_out
+
+
+def unfold_lists(record, fields, number_field='n'):
+    rec_common = {k: v for k, v in record.items() if k not in fields}
+    fold_values = [record.get(f, []) for f in fields]
+    for n, unfold_values in enumerate(zip(*fold_values)):
+        rec_out = rec_common.copy()
+        rec_out.update({k: v for k, v in zip(*fold_values)})
+        if number_field:
+            rec_out[number_field] = n
+        yield rec_out
