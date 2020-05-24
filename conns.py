@@ -38,6 +38,7 @@ CONN_CLASSES = (
     LocalFolder, AbstractFile,
     TextFile, JsonFile, CsvFile, TsvFile,
 )
+DATABASE_TYPES = [PostgresDatabase.__class__.__name__, ClickhouseDatabase.__class__.__name__]
 DICT_EXT_TO_TYPE = {'txt': TextFile, 'json': JsonFile, 'csv': CsvFile, 'tsv': TsvFile}
 
 
@@ -83,3 +84,11 @@ def is_conn(obj):
 
 def is_file(obj):
     return isinstance(obj, (TextFile, JsonFile, CsvFile, TsvFile))
+
+
+def is_folder(obj):
+    return obj.__class__.__name__ == 'LocalFolder'
+
+
+def is_database(obj):
+    return obj.__class__.__name__ in DATABASE_TYPES
