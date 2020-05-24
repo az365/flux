@@ -17,9 +17,6 @@ class FieldType(Enum):
     Str256 = 'str256'
     Int = 'int'
     Float = 'float'
-    IsoDate = 'date'
-    IsoTime = 'time'
-    IsoDatetime = 'datetime'
     Bool = 'bool'
     Tuple = 'tuple'
     Dict = 'dict'
@@ -34,10 +31,13 @@ def any_to_bool(value):
 
 def safe_converter(converter, default_value=0):
     def func(value):
-        try:
-            return converter(value)
-        except ValueError:
+        if value == '':
             return default_value
+        else:
+            try:
+                return converter(value)
+            except ValueError:
+                return default_value
     return func
 
 
@@ -51,24 +51,22 @@ FIELD_TYPES = {
     FieldType.Str256.value: dict(py=str, pg='varchar(256)', ch='FixedString(256)', str_to_py=str),
     FieldType.Int.value: dict(py=int, pg='int', ch='Int32', str_to_py=safe_converter(int)),
     FieldType.Float.value: dict(py=float, pg='numeric', ch='Float32', str_to_py=safe_converter(float)),
-    FieldType.IsoDate.value: dict(py=date, pg='date', ch='Date', str_to_py=date.fromisoformat),
-    FieldType.IsoTime.value: dict(py=date, pg='time', str_to_py=time.fromisoformat),
-    FieldType.IsoDatetime.value: dict(py=date, pg='timestamp', ch='Datetime', str_to_py=datetime.fromisoformat),
     FieldType.Bool.value: dict(py=bool, pg='bool', ch='UInt8', str_to_py=any_to_bool, py_to_ch=safe_converter(int)),
-    FieldType.Tuple.value: dict(py=tuple, pg='text', str_to_py=eval),
-    FieldType.Dict.value: dict(py=dict, pg='text', str_to_py=eval),
+    FieldType.Tuple.value: dict(py=tuple, pg='text', str_to_py=safe_converter(eval, tuple())),
+    FieldType.Dict.value: dict(py=dict, pg='text', str_to_py=(eval, dict())),
 }
 AGGR_HINTS = (None, 'id', 'cat', 'measure')
 HEURISTIC_SUFFIX_TO_TYPE = {
+    'hist': FieldType.Dict,
+    'names': FieldType.Tuple,
+    'ids': FieldType.Tuple,
     'id': FieldType.Int,
     'count': FieldType.Int,
     'sum': FieldType.Float,
     'share': FieldType.Float,
+    'weight': FieldType.Float,
     'is': FieldType.Bool,
     'has': FieldType.Bool,
-    'ids': FieldType.Tuple,
-    'names': FieldType.Tuple,
-    'hist': FieldType.Dict,
     None: FieldType.Str,
 }
 
@@ -153,6 +151,12 @@ class FieldDescription:
         py_type = self.get_type_in('py')
         return isinstance(value, py_type)
 
+    def get_tuple(self):
+        return self.name, self.field_type, self.nullable, self.aggr_hint
+
+    def __str__(self):
+        return ', '.join(map(str, self.get_tuple()))
+
 
 class SchemaDescription:
     def __init__(
@@ -180,7 +184,7 @@ class SchemaDescription:
     def get_fields_count(self):
         return len(self.fields_descriptions)
 
-    def get_schema_str(self, dialect):
+    def get_schema_str(self, dialect='py'):
         if dialect is not None and dialect not in DIALECTS:
             dialect = get_dialect_for_conn_type(dialect)
         field_strings = [
