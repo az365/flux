@@ -29,9 +29,8 @@ DEFAULT_STEP = 1000
 
 
 class DatabaseType(Enum):
-    MysqlDatabase = 'MysqlDatabase'
-    PostgresDatabase = 'PostgresDatabase'
-    ClickhouseDatabase = 'ClickhouseDatabase'
+    PostgresDatabase = 'pg'
+    ClickhouseDatabase = 'ch'
 
 
 class AbstractDatabase(ABC):
@@ -92,6 +91,10 @@ class AbstractDatabase(ABC):
     @classmethod
     def need_connection(cls):
         return hasattr(cls, 'connection')
+
+    @abstractmethod
+    def get_dialect_name(self):
+        pass
 
     @abstractmethod
     def exists_table(self, name, verbose=arg.DEFAULT):
@@ -458,6 +461,9 @@ class PostgresDatabase(AbstractDatabase):
         progress.finish(n)
         if return_count:
             return n
+
+    def get_dialect_name(self):
+        return DatabaseType.PostgresDatabase.value
 
 
 class ClickhouseDatabase(AbstractDatabase):
