@@ -7,6 +7,7 @@ try:  # Assume we're a sub-module in a package.
     import fluxes as fx
     from utils import (
         arguments as arg,
+        schema as sh,
         functions as fs,
         mappers as ms,
         log_progress,
@@ -15,6 +16,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     from .. import fluxes as fx
     from ..utils import (
         arguments as arg,
+        schema as sh,
         functions as fs,
         mappers as ms,
         log_progress,
@@ -130,10 +132,16 @@ class AbstractDatabase(ABC):
 
     def create_table(self, name, schema, drop_if_exists=False, verbose=arg.DEFAULT):
         verbose = arg.undefault(verbose, self.verbose)
-        if isinstance(schema, str):
+        if isinstance(schema, sh.SchemaDescription):
+            schema_str = schema.get_schema_str(dialect=self.get_dialect_name())
+        elif isinstance(schema, str):
             schema_str = schema
+            message = 'String Schemas is deprecated. Use schema.SchemaDescription instead.'
+            self.log(msg=message, level=log_progress.LoggingLevel.Warning)
         else:
             schema_str = ', '.join(['{} {}'.format(c[0], c[1]) for c in schema])
+            message = 'Tuple Schemas is deprecated. Use schema.SchemaDescription instead.'
+            self.log(msg=message, level=log_progress.LoggingLevel.Warning)
         if drop_if_exists:
             self.drop_table(name, verbose=verbose)
         message = 'Creating table:'
@@ -177,8 +185,8 @@ class AbstractDatabase(ABC):
 
     def rename_table(self, old, new, if_exists=False, verbose=arg.DEFAULT):
         cat_old, name_old = old.split('.')
-        cat_new, name_new = new.split('.') if '.' in new else cat_old, new
-        assert cat_new == cat_old, 'Can copy within same scheme (folder) only'
+        cat_new, name_new = new.split('.') if '.' in new else (cat_old, new)
+        assert cat_new == cat_old, 'Can copy within same scheme (folder) only (got {} and {})'.format(cat_new, cat_old)
         new = name_new
         self.execute_if_exists(
             query='ALTER TABLE {old} RENAME TO {new};'.format(old=old, new=new),
@@ -221,8 +229,7 @@ class AbstractDatabase(ABC):
         pass
 
     def insert_schematized_flux(self, table, flux, skip_errors=False, step=DEFAULT_STEP, verbose=arg.DEFAULT):
-        schema = flux.get_schema()
-        columns = [c[0] for c in schema]
+        columns = flux.get_columns()
         expected_count = flux.count
         final_count = flux.calc(
             lambda a: self.insert_rows(
@@ -438,8 +445,8 @@ class PostgresDatabase(AbstractDatabase):
             values=', '.join(placeholders),
         )
         message = verbose if isinstance(verbose, str) else 'Committing {}-rows batches into {}'.format(step, table)
-        progress = self.get_logger().Progress(
-            message, count=count, verbose=verbose, logger=self.get_logger(), context=self.context
+        progress = log_progress.Progress(
+            message, count=count, verbose=verbose, logger=self.get_logger(), context=self.context,
         )
         progress.start()
         n = 0
@@ -558,6 +565,9 @@ class ClickhouseDatabase(AbstractDatabase):
         if return_count:
             return n
 
+    def get_dialect_name(self):
+        return DatabaseType.ClickhouseDatabase.value
+
 
 class Table:
     def __init__(
@@ -570,9 +580,10 @@ class Table:
     ):
         self.name = name
         self.schema = schema
+        if not isinstance(schema, sh.SchemaDescription):
+            message = 'Schema as {} is deprecated. Use schema.SchemaDescription instead.'.format(type(schema))
+            self.log(msg=message, level=log_progress.LoggingLevel.Warning)
         self.meta = kwargs
-        assert isinstance(database, AbstractDatabase)
-        self.database = database
         if reconnect:
             if hasattr(self.database, 'connect'):
                 self.database.connect(reconnect=True)
@@ -609,6 +620,24 @@ class Table:
         )
         self.links.append(flux)
         return flux
+
+    def set_schema(self, schema):
+        if schema is None:
+            self.schema = None
+        elif isinstance(schema, sh.SchemaDescription):
+            self.schema = schema
+        elif isinstance(schema, (list, tuple)):
+            if max([isinstance(f, (list, tuple)) for f in schema]):
+                self.schema = sh.SchemaDescription(schema)
+            else:
+                self.schema = sh.detect_schema_by_title_row(schema)
+        elif schema == AUTO:
+            if self.first_line_is_title:
+                self.schema = self.detect_schema_by_title_row()
+            else:
+                self.schema = None
+            message = 'schema must be SchemaDescription or tuple with fields_description (got {})'.format(type(schema))
+            raise TypeError(message)
 
     def create(self, drop_if_exists, verbose=arg.DEFAULT):
         return self.database.create_table(
