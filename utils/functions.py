@@ -13,7 +13,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
 
 
 DICT_CAST_TYPES = dict(bool=bool, int=int, float=float, str=str, text=str, date=str)
-ZERO_VALUES = (None, 'None', '', 0)
+ZERO_VALUES = (None, 'None', '', '-', 0)
 
 
 def partial(function, *args, **kwargs):
@@ -37,7 +37,7 @@ def const(value):
 def cast(field_type, default_int=0):
     def func(value):
         cast_function = DICT_CAST_TYPES.get(field_type, field_type)
-        if value in (None, 'None', '') and field_type in ('int', int):
+        if value in (None, 'None', '') and field_type in ('int', int, float):
             value = default_int
         return cast_function(value)
     return func
@@ -165,7 +165,7 @@ def apply_dict(dictionary, default=None):
 
 def elem_no(position, default=None):
     def func(array):
-        if 0 <= position < len(array):
+        if isinstance(array, (list, tuple)) and 0 <= position < len(array):
             return array[position]
         else:
             return default
