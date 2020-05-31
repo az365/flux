@@ -362,6 +362,18 @@ class TextFile(AbstractFile):
             **self.flux_kwargs(**kwargs)
         )
 
+    def write_lines(self, lines, verbose=AUTO):
+        verbose = arg.undefault(verbose, self.verbose)
+        self.open('w', reopen=True)
+        n = 0
+        for n, i in enumerate(lines):
+            if n > 0:
+                self.fileholder.write(self.end.encode(self.encoding) if self.gzip else self.end)
+            self.fileholder.write(str(i).encode(self.encoding) if self.gzip else str(i))
+        self.fileholder.close()
+        self.close()
+        self.log('Done. {} rows has written into {}'.format(n + 1, self.get_name()), verbose=verbose)
+
 
 class JsonFile(TextFile):
     def __init__(
@@ -447,7 +459,10 @@ class CsvFile(TextFile):
         elif isinstance(schema, sh.SchemaDescription):
             self.schema = schema
         elif isinstance(schema, (list, tuple)):
-            self.schema = sh.SchemaDescription(schema)
+            if max([isinstance(f, (list, tuple)) for f in schema]):
+                self.schema = sh.SchemaDescription(schema)
+            else:
+                self.schema = sh.detect_schema_by_title_row(schema)
         elif schema == AUTO:
             if self.first_line_is_title:
                 self.schema = self.detect_schema_by_title_row()
@@ -465,10 +480,14 @@ class CsvFile(TextFile):
         title_row = next(rows)
         self.close()
         schema = sh.detect_schema_by_title_row(title_row)
-        self.log('Schema detected by title row: {}'.format(schema.get_schema_str(None)), end='\n', verbose=verbose)
+        message = 'Schema for {} detected by title row: {}'.format(self.filename, schema.get_schema_str(None))
+        self.log(message, end='\n', verbose=verbose)
         if set_schema:
-            self.schema = set_schema
+            self.schema = schema
         return schema
+
+    def get_columns(self):
+        return self.get_schema().get_columns()
 
     def get_rows(self, convert_types=True, verbose=AUTO, step=AUTO):
         lines = self.get_lines(
@@ -499,10 +518,13 @@ class CsvFile(TextFile):
         for item in self.get_rows(convert_types=convert_types):
             yield {k: v for k, v in zip(self.get_schema().get_columns(), item)}
 
-    def get_dict(self, key, value):
+    def get_dict(self, key, value, skip_errors=False):
         result = dict()
+        kws = dict(logger=self.get_logger(), skip_errors=skip_errors)
         for r in self.get_records():
-            result[r.get(key)] = r.get(value)
+            cur_key = selection.value_from_record(r, key, **kws)
+            cur_value = selection.value_from_record(r, value, **kws)
+            result[cur_key] = cur_value
         return result
 
     def to_rows_flux(self, name=None, **kwargs):
@@ -530,6 +552,33 @@ class CsvFile(TextFile):
         if name:
             flux.set_name(name)
         return flux
+
+    def write_rows(self, rows, verbose=AUTO):
+        def get_rows_with_title():
+            if self.first_line_is_title:
+                yield self.get_columns()
+            for r in rows:
+                assert len(r) == len(self.get_columns())
+                yield map(str, r)
+            lines = map(self.delimiter.join, get_rows_with_title())
+            self.write_lines(lines, verbose=verbose)
+
+    def write_records(self, records, verbose=AUTO):
+        rows = map(
+            lambda r: [r.get(f, '') for f in self.get_columns()],
+            records,
+        )
+        self.write_rows(rows, verbose=verbose)
+
+    def write_flux(self, flux, verbose=AUTO):
+        assert fx.is_flux()
+        methods_for_classes = dict(RecordFlux=self.write_records, RowsFlux=self.write_rows, LinesFlux=self.write_lines)
+        method = methods_for_classes.get(flux.class_name())
+        if method:
+            method(flux.data, verbose=verbose)
+        else:
+            message = 'CsvFile.write_flux() supports RecordsFlux, RowsFlux, LinesFlux oly (got {})'
+            raise TypeError(message.format(flux.class_name()))
 
 
 class TsvFile(CsvFile):
