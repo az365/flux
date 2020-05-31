@@ -216,3 +216,22 @@ def composite_key(*functions):
             result.append(value)
         return tuple(result)
     return func
+
+
+def shifted_func(func):
+    def func_(x, y):
+        assert len(x) == len(y)
+        shift_max = len(x) - 1
+        result = list()
+        for shift in range(-shift_max + 2, 0):
+            shifted_x = x[0: shift_max + shift]
+            shifted_y = y[- shift: shift_max]
+            stat = func(shifted_x, shifted_y)
+            result.append(stat)
+        if shift in range(0, shift_max - 1):
+            shifted_x = x[shift: shift_max]
+            shifted_y = y[0: shift_max - shift]
+            stat = func(shifted_x, shifted_y)
+            result.append(stat)
+        return result
+    return func_
