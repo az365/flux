@@ -223,6 +223,18 @@ class SchemaDescription:
             converters.append(desc.get_converter(from_, to_))
         return tuple(converters)
 
+    def get_field_description(self, field_name):
+        field_position = self.get_field_position(field_name)
+        return self.fields_descriptions[field_position]
+
+    def set_types(self, dict_field_types=None, return_schema=True, **kwargs):
+        for field_name, field_type in list((dict_field_types or {}).items()) + list(kwargs.items()):
+            field_description = self.get_field_description(field_name)
+            assert isinstance(field_description, FieldDescription)
+            field_description.field_type = get_canonic_type(field_type)
+        if return_schema:
+            return self
+
 
 class SchemaRow:
     def __init__(
