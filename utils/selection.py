@@ -77,13 +77,21 @@ def value_from_row(row, description):
         raise TypeError(message.format(description, type(description)))
 
 
-def value_from_record(record, description):
+def value_from_record(record, description, logger=None, skip_errors=True):
     if callable(description):
         return description(record)
     elif isinstance(description, (list, tuple)):
         function, fields = process_description(description)
         values = [record.get(f) for f in fields]
-        return function(*values)
+        try:
+            return function(*values)
+        except BaseException as e:
+            if logger:
+                level = 30 if skip_errors else 40
+                message = 'Error while processing function {} over fields {} with values {}.'
+                logger.log(msg=message.format(function.__name__, fields, values), level=level)
+            if not skip_errors:
+                raise e
     else:
         return record.get(description)
 
