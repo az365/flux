@@ -14,7 +14,10 @@ try:  # Assume we're a sub-module in a package.
     from streams.schema_flux import SchemaFlux
     from streams.records_flux import RecordsFlux
     from streams.pandas_flux import PandasFlux
-    from utils import arguments as arg
+    from utils import (
+        arguments as arg,
+        schema,
+    )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .streams.any_flux import AnyFlux
     from .streams.lines_flux import LinesFlux
@@ -23,7 +26,10 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     from .streams.schema_flux import SchemaFlux
     from .streams.records_flux import RecordsFlux
     from .streams.pandas_flux import PandasFlux
-    from .utils import arguments as arg
+    from .utils import (
+        arguments as arg,
+        schema,
+    )
 
 
 class FluxType(Enum):
@@ -71,6 +77,10 @@ def is_row(item):
 
 def is_record(item):
     return RecordsFlux.is_valid_item(item)
+
+
+def is_schema_row(item):
+    return isinstance(item, schema.SchemaRow)
 
 
 def concat(*list_fluxes):
