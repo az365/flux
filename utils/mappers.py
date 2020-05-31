@@ -171,12 +171,15 @@ def fold_lists(list_records, key_fields, list_fields):
     return rec_out
 
 
-def unfold_lists(record, fields, number_field='n'):
+def unfold_lists(record, fields, number_field='n', default_value=0):
     rec_common = {k: v for k, v in record.items() if k not in fields}
     fold_values = [record.get(f, []) for f in fields]
+    if default_value is not None:
+        max_len = max([len(a or []) for a in fold_values])
+        fold_values = [(a or []) + [default_value] * (max_len - len(a)) for a in fold_values]
     for n, unfold_values in enumerate(zip(*fold_values)):
         rec_out = rec_common.copy()
-        rec_out.update({k: v for k, v in zip(*fold_values)})
+        rec_out.update({k: v for k, v in zip(fields, unfold_values)})
         if number_field:
             rec_out[number_field] = n
         yield rec_out
