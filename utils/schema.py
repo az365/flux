@@ -53,7 +53,7 @@ FIELD_TYPES = {
     FieldType.Float.value: dict(py=float, pg='numeric', ch='Float32', str_to_py=safe_converter(float)),
     FieldType.Bool.value: dict(py=bool, pg='bool', ch='UInt8', str_to_py=any_to_bool, py_to_ch=safe_converter(int)),
     FieldType.Tuple.value: dict(py=tuple, pg='text', str_to_py=safe_converter(eval, tuple())),
-    FieldType.Dict.value: dict(py=dict, pg='text', str_to_py=(eval, dict())),
+    FieldType.Dict.value: dict(py=dict, pg='text', str_to_py=safe_converter(eval, dict())),
 }
 AGGR_HINTS = (None, 'id', 'cat', 'measure')
 HEURISTIC_SUFFIX_TO_TYPE = {
@@ -61,10 +61,15 @@ HEURISTIC_SUFFIX_TO_TYPE = {
     'names': FieldType.Tuple,
     'ids': FieldType.Tuple,
     'id': FieldType.Int,
+    'hits': FieldType.Int,
     'count': FieldType.Int,
     'sum': FieldType.Float,
+    'avg': FieldType.Float,
     'share': FieldType.Float,
+    'norm': FieldType.Float,
     'weight': FieldType.Float,
+    'value': FieldType.Float,
+    'coef': FieldType.Float,
     'is': FieldType.Bool,
     'has': FieldType.Bool,
     None: FieldType.Str,
