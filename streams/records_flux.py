@@ -2,6 +2,7 @@ import pandas as pd
 
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
+    import conns as cs
     from utils import (
         arguments as arg,
         functions as fs,
@@ -9,6 +10,7 @@ try:  # Assume we're a sub-module in a package.
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
+    from .. import conns as cs
     from ..utils import (
         arguments as arg,
         functions as fs,
@@ -224,9 +226,8 @@ class RecordsFlux(fx.AnyFlux):
         )
 
     def schematize(self, schema, skip_bad_rows=False, skip_bad_values=False, verbose=True):
-        return fx.SchemaFlux(
-            self.get_items(),
-            **self.get_meta()
+        return self.to_rows(
+            columns=schema.get_columns(),
         ).schematize(
             schema=schema,
             skip_bad_rows=skip_bad_rows,
@@ -246,6 +247,20 @@ class RecordsFlux(fx.AnyFlux):
             secondary=fx.FluxType.RecordsFlux if value is None else fx.FluxType.AnyFlux,
             check=False,
         )
+
+    def to_tsv_file(
+            self,
+            file,
+            verbose=True,
+            return_flux=True,
+    ):
+        assert cs.is_file(file)
+        meta = self.get_meta()
+        if not file.gzip:
+            meta.pop('count')
+        file.write_flux(self, verbose=verbose)
+        if return_flux:
+            return file.to_records_flux(verbose=verbose).update_meta(**meta)
 
     def to_csv_file(
             self,
