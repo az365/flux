@@ -5,6 +5,7 @@ import psycopg2
 
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
+    import conns as cs
     from utils import (
         arguments as arg,
         schema as sh,
@@ -14,6 +15,7 @@ try:  # Assume we're a sub-module in a package.
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
+    from .. import conns as cs
     from ..utils import (
         arguments as arg,
         schema as sh,
@@ -249,6 +251,9 @@ class AbstractDatabase(ABC):
     ):
         if fx.is_flux(data):
             fx_input = data
+        elif cs.is_file(data):
+            fx_input = data.to_schema_flux()
+            assert fx_input.get_columns() == sh.SchemaDescription(schema).get_columns()
         elif isinstance(data, str):
             fx_input = fx.RowsFlux.from_csv_file(
                 filename=data,
@@ -584,6 +589,7 @@ class Table:
             message = 'Schema as {} is deprecated. Use schema.SchemaDescription instead.'.format(type(schema))
             self.log(msg=message, level=log_progress.LoggingLevel.Warning)
         self.meta = kwargs
+        self.database = database
         if reconnect:
             if hasattr(self.database, 'connect'):
                 self.database.connect(reconnect=True)
@@ -636,6 +642,7 @@ class Table:
                 self.schema = self.detect_schema_by_title_row()
             else:
                 self.schema = None
+        else:
             message = 'schema must be SchemaDescription or tuple with fields_description (got {})'.format(type(schema))
             raise TypeError(message)
 
