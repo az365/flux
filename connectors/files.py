@@ -72,9 +72,7 @@ class LocalFolder:
 
     def file(self, name, filetype=AUTO, **kwargs):
         file = self.files.get(name)
-        if file:
-            assert not kwargs, 'file connection {} is already registered'.format(name)
-        else:
+        if kwargs or not file:
             filename = kwargs.pop('filename', name)
             file_ext = filename.split('.')[-1]
             supposed_type = cs.DICT_EXT_TO_TYPE.get(file_ext, cs.ConnType.TextFile)
@@ -125,7 +123,7 @@ class AbstractFile(ABC):
         self.fileholder = None
         if folder:
             message = 'only LocalFolder supported for *File instances (got {})'.format(type(folder))
-            assert cs.is_folder(), message
+            assert cs.is_folder(folder), message
             self.folder = folder
         elif context:
             assert isinstance(context, fc.FluxContext)
@@ -208,7 +206,7 @@ class AbstractFile(ABC):
         if self.fileholder is None:
             return False
         else:
-            return self.fileholder is not None
+            return not self.fileholder.closed
 
     def close(self):
         if self.is_opened():
@@ -459,7 +457,8 @@ class CsvFile(TextFile):
         elif isinstance(schema, sh.SchemaDescription):
             self.schema = schema
         elif isinstance(schema, (list, tuple)):
-            if max([isinstance(f, (list, tuple)) for f in schema]):
+            has_types_descriptions = [isinstance(f, (list, tuple)) for f in schema]
+            if max(has_types_descriptions):
                 self.schema = sh.SchemaDescription(schema)
             else:
                 self.schema = sh.detect_schema_by_title_row(schema)
@@ -560,8 +559,8 @@ class CsvFile(TextFile):
             for r in rows:
                 assert len(r) == len(self.get_columns())
                 yield map(str, r)
-            lines = map(self.delimiter.join, get_rows_with_title())
-            self.write_lines(lines, verbose=verbose)
+        lines = map(self.delimiter.join, get_rows_with_title())
+        self.write_lines(lines, verbose=verbose)
 
     def write_records(self, records, verbose=AUTO):
         rows = map(
