@@ -111,15 +111,21 @@ def get_dialect_for_conn_type(db_obj):
         return 'str'
 
 
+def detect_field_type_by_name(field_name):
+    name_parts = field_name.split('_')
+    default_type = HEURISTIC_SUFFIX_TO_TYPE[None]
+    field_type = default_type
+    for suffix in HEURISTIC_SUFFIX_TO_TYPE:
+        if suffix in name_parts:
+            field_type = HEURISTIC_SUFFIX_TO_TYPE[suffix]
+            break
+    return field_type
+
+
 def detect_schema_by_title_row(title_row):
     schema = SchemaDescription([])
     for name in title_row:
-        name_parts = name.split('_')
-        field_type = HEURISTIC_SUFFIX_TO_TYPE[None]
-        for suffix in HEURISTIC_SUFFIX_TO_TYPE:
-            if suffix in name_parts:
-                field_type = HEURISTIC_SUFFIX_TO_TYPE[suffix]
-                break
+        field_type = detect_field_type_by_name(name)
         schema.append_field(
             FieldDescription(name, field_type)
         )
@@ -135,7 +141,10 @@ class FieldDescription:
             aggr_hint=None,
     ):
         self.name = name
-        self.field_type = get_canonic_type(field_type)
+        if field_type is None:
+            self.field_type = detect_field_type_by_name(name)
+        else:
+            self.field_type = get_canonic_type(field_type)
         assert isinstance(nullable, bool)
         self.nullable = nullable
         assert aggr_hint in AGGR_HINTS
