@@ -182,11 +182,11 @@ class SchemaDescription:
         for field in fields_descriptions:
             self.append_field(field)
 
-    def append_field(self, field):
+    def append_field(self, field, default_type=None):
         if isinstance(field, FieldDescription):
             field_desc = field
         elif isinstance(field, str):
-            field_desc = FieldDescription(field)
+            field_desc = FieldDescription(field, default_type)
         elif isinstance(field, (list, tuple)):
             field_desc = FieldDescription(*field)
         elif isinstance(field, dict):
