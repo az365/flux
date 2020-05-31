@@ -78,7 +78,8 @@ def apply_schema_to_row(row, schema, skip_bad_values=False, logger=None):
                     raise e
             row[c] = new_value
         return row
-    return TypeError
+    else:
+        return TypeError
 
 
 class SchemaFlux(fx.RowsFlux):
@@ -133,9 +134,9 @@ class SchemaFlux(fx.RowsFlux):
         def apply_schema_to_rows(rows):
             if isinstance(schema, sh.SchemaDescription):
                 converters = schema.get_converters('str', 'py')
-                for row in rows:
-                    converted_row = tuple()
-                    for value, converter in zip(row, converters):
+                for r in rows:
+                    converted_row = list()
+                    for value, converter in zip(r, converters):
                         converted_value = converter(value)
                         converted_row.append(converted_value)
                     yield converted_row.copy()
@@ -143,7 +144,7 @@ class SchemaFlux(fx.RowsFlux):
                 for r in rows:
                     if skip_bad_rows:
                         try:
-                            yield apply_schema_to_row(r, schema, skip_bad_values=False, logger=self if verbose else None)
+                            yield apply_schema_to_row(r, schema, False, logger=self if verbose else None)
                         except ValueError:
                             self.log(['Skip bad row:', r], verbose=verbose)
                     else:
