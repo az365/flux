@@ -146,7 +146,7 @@ class RecordsFlux(fx.AnyFlux):
         else:
             return self.disk_sort(key_function, reverse, step=step, verbose=verbose)
 
-    def sorted_group_by(self, *keys, as_pairs=True):
+    def sorted_group_by(self, *keys, as_pairs=False):
         keys = arg.update(keys)
 
         def get_groups():
@@ -173,7 +173,7 @@ class RecordsFlux(fx.AnyFlux):
             )
         return fx_groups.to_memory() if self.is_in_memory() else fx_groups
 
-    def group_by(self, *keys, step=arg.DEFAULT, as_pairs=True, verbose=True):
+    def group_by(self, *keys, step=arg.DEFAULT, as_pairs=False, verbose=True):
         keys = arg.update(keys)
         step = arg.undefault(step, self.max_items_in_memory)
         if not as_pairs:
