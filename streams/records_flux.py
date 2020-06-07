@@ -6,6 +6,7 @@ try:  # Assume we're a sub-module in a package.
     from utils import (
         arguments as arg,
         functions as fs,
+        mappers as ms,
         selection,
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
@@ -14,6 +15,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     from ..utils import (
         arguments as arg,
         functions as fs,
+        mappers as ms,
         selection,
     )
 
@@ -146,7 +148,7 @@ class RecordsFlux(fx.AnyFlux):
         else:
             return self.disk_sort(key_function, reverse, step=step, verbose=verbose)
 
-    def sorted_group_by(self, *keys, as_pairs=False):
+    def sorted_group_by(self, *keys, values=None, as_pairs=False):
         keys = arg.update(keys)
 
         def get_groups():
@@ -162,32 +164,31 @@ class RecordsFlux(fx.AnyFlux):
                 accumulated.append(r)
             yield (prev_k, accumulated) if as_pairs else accumulated
         if as_pairs:
-            fx_groups = fx.PairsFlux(
-                get_groups(),
-                secondary=fx.FluxType.RowsFlux,
-            )
+            fx_groups = fx.PairsFlux(get_groups(), secondary=fx.FluxType.RowsFlux)
         else:
-            fx_groups = fx.RowsFlux(
-                get_groups(),
-                check=False,
+            fx_groups = fx.RowsFlux(get_groups(), check=False)
+        if values:
+            fx_groups = fx_groups.map_to_records(
+                lambda r: ms.fold_lists(r, keys, values),
             )
         return fx_groups.to_memory() if self.is_in_memory() else fx_groups
 
-    def group_by(self, *keys, step=arg.DEFAULT, as_pairs=False, verbose=True):
+    def group_by(self, *keys, values=None, step=arg.DEFAULT, as_pairs=False, verbose=True):
         keys = arg.update(keys)
         step = arg.undefault(step, self.max_items_in_memory)
-        if not as_pairs:
-            keys = [
-                get_key_function(keys, take_hash=True),
-            ]
+        if as_pairs:
+            key_for_sort = keys
+        else:
+            key_for_sort = get_key_function(keys, take_hash=True)
         sorted_fx = self.sort(
-            *keys,
+            key_for_sort,
             step=step,
             verbose=verbose,
         )
         grouped_fx = sorted_fx.sorted_group_by(
             keys,
-            as_pairs=as_pairs
+            values=values,
+            as_pairs=as_pairs,
         )
         return grouped_fx
 
