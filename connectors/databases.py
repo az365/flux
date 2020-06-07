@@ -249,6 +249,10 @@ class AbstractDatabase(ABC):
             skip_lines=0, skip_errors=False, step=DEFAULT_STEP,
             verbose=arg.DEFAULT,
     ):
+        if not isinstance(schema, sh.SchemaDescription):
+            message = 'Schema as {} is deprecated, use sh.SchemaDescription instead'.format(type(schema))
+            self.log(msg=message, level=log_progress.LoggingLevel.Warning)
+            schema = sh.SchemaDescription(schema)
         if fx.is_flux(data):
             fx_input = data
         elif cs.is_file(data):
