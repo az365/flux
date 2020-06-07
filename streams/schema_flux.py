@@ -49,7 +49,8 @@ def check_rows(rows, schema, skip_errors=False):
         elif skip_errors:
             continue
         else:
-            raise TypeError('check_records(): this item is not valid record for schema {}: {}'.format(schema, r))
+            schema_str = schema.get_schema_str() if isinstance(schema, sh.SchemaDescription) else schema
+            raise TypeError('check_records(): this item is not valid record for schema {}: {}'.format(schema_str, r))
         yield r
 
 
@@ -86,7 +87,7 @@ def apply_schema_to_row(row, schema, skip_bad_values=False, logger=None):
             row[c] = new_value
         return row
     else:
-        return TypeError
+        raise TypeError
 
 
 class SchemaFlux(fx.RowsFlux):
