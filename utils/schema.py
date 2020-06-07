@@ -210,6 +210,17 @@ class SchemaDescription:
     def get_columns(self):
         return [c.name for c in self.fields_descriptions]
 
+    def get_types(self, dialect):
+        return [c.get_type_in(dialect) for c in self.fields_descriptions]
+
+    def set_types(self, dict_field_types=None, return_schema=True, **kwargs):
+        for field_name, field_type in list((dict_field_types or {}).items()) + list(kwargs.items()):
+            field_description = self.get_field_description(field_name)
+            assert isinstance(field_description, FieldDescription)
+            field_description.field_type = get_canonic_type(field_type)
+        if return_schema:
+            return self
+
     def get_field_position(self, name):
         return self.get_columns().index(name)
 
@@ -227,13 +238,11 @@ class SchemaDescription:
         field_position = self.get_field_position(field_name)
         return self.fields_descriptions[field_position]
 
-    def set_types(self, dict_field_types=None, return_schema=True, **kwargs):
-        for field_name, field_type in list((dict_field_types or {}).items()) + list(kwargs.items()):
-            field_description = self.get_field_description(field_name)
-            assert isinstance(field_description, FieldDescription)
-            field_description.field_type = get_canonic_type(field_type)
-        if return_schema:
-            return self
+    def is_valid_row(self, row):
+        for value, field_type in zip(row, self.get_types('py')):
+            if not isinstance(value, field_type):
+                return False
+        return True
 
 
 class SchemaRow:

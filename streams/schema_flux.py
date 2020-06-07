@@ -23,15 +23,22 @@ def is_row(row):
 
 def is_valid(row, schema):
     if is_row(row):
-        if schema is not None:
-            for value, description in zip(row, schema):
+        if isinstance(schema, sh.SchemaDescription):
+            return schema.is_valid_row(row)
+        elif isinstance(schema, (list, tuple)):
+            types = list()
+            default_type = str
+            for description in schema:
                 field_type = description[TYPE_POS]
                 if field_type in fs.DICT_CAST_TYPES.values():
-                    return isinstance(value, field_type)
-                elif field_type == fs.DICT_CAST_TYPES.keys():
-                    selected_type = fs.DICT_CAST_TYPES[field_type]
-                    return isinstance(value, selected_type)
-        else:
+                    types.append(field_type)
+                else:
+                    types.append(fs.DICT_CAST_TYPES.get(field_type, default_type))
+            for value, field_type in zip(row, types):
+                if not isinstance(value, field_type):
+                    return False
+            return True
+        elif schema is None:
             return True
 
 
