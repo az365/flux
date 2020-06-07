@@ -124,6 +124,23 @@ def safe_more_than(other, including=False):
     return func
 
 
+def top(count=10, output_values=False):
+    def func(keys, values=None):
+        if values:
+            pairs = sorted(zip(keys, values), key=lambda i: i[1], reverse=True)
+        else:
+            dict_counts = dict()
+            for k in keys:
+                dict_counts[k] = dict_counts.get(k, 0)
+            pairs = sorted(dict_counts.items())
+        top_n = pairs[:count]
+        if output_values:
+            return top_n
+        else:
+            return [i[0] for i in top_n]
+    return func
+
+
 def is_ordered(reverse=False, including=True):
     def func(previous, current):
         if current == previous:
@@ -228,7 +245,7 @@ def shifted_func(func):
             shifted_y = y[- shift: shift_max]
             stat = func(shifted_x, shifted_y)
             result.append(stat)
-        if shift in range(0, shift_max - 1):
+        for shift in range(0, shift_max - 1):
             shifted_x = x[shift: shift_max]
             shifted_y = y[0: shift_max - shift]
             stat = func(shifted_x, shifted_y)
