@@ -488,6 +488,14 @@ class CsvFile(TextFile):
     def get_columns(self):
         return self.get_schema().get_columns()
 
+    def get_types(self):
+        return self.get_schema().get_types()
+
+    def set_types(self, dict_field_types=None, return_file=True, **kwargs):
+        self.get_schema().set_types(dict_field_types=dict_field_types, return_schema=False, **kwargs)
+        if return_file:
+            return self
+
     def get_rows(self, convert_types=True, verbose=AUTO, step=AUTO):
         lines = self.get_lines(
             skip_first=self.first_line_is_title,
@@ -570,13 +578,13 @@ class CsvFile(TextFile):
         self.write_rows(rows, verbose=verbose)
 
     def write_flux(self, flux, verbose=AUTO):
-        assert fx.is_flux()
-        methods_for_classes = dict(RecordFlux=self.write_records, RowsFlux=self.write_rows, LinesFlux=self.write_lines)
+        assert fx.is_flux(flux)
+        methods_for_classes = dict(RecordsFlux=self.write_records, RowsFlux=self.write_rows, LinesFlux=self.write_lines)
         method = methods_for_classes.get(flux.class_name())
         if method:
             method(flux.data, verbose=verbose)
         else:
-            message = 'CsvFile.write_flux() supports RecordsFlux, RowsFlux, LinesFlux oly (got {})'
+            message = 'CsvFile.write_flux() supports RecordsFlux, RowsFlux, LinesFlux only (got {})'
             raise TypeError(message.format(flux.class_name()))
 
 
