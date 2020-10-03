@@ -41,22 +41,21 @@ class PandasFlux(fx.RecordsFlux):
             tmp_files_encoding=tmp_files_encoding,
         )
 
-    def iterable(self, as_series=True):
+    def iterable(self, as_records=True):
         for i in self.get_dataframe().iterrows():
-            if as_series:
-                yield i[1]
+            if as_records:
+                yield i[1].to_dict()
             else:
-                yield i
+                yield i[1]
 
     def expected_count(self):
-        return self.data.shape[1]
+        return self.data.shape[0]
 
     def final_count(self):
-        return self.data.shape[1]
+        return self.data.shape[0]
 
     def get_records(self, **kwargs):
-        for series in self.iterable(as_series=True):
-            yield dict(series)
+        yield from self.iterable(as_records=True)
 
     def get_dataframe(self, columns=None):
         if columns:
@@ -91,8 +90,8 @@ class PandasFlux(fx.RecordsFlux):
         else:
             return self.add_items(dataframe_or_flux_or_items)
 
-    def select(self, *fields, **selectors):
-        assert not selectors, 'custom selectors are not implemented now'
+    def select(self, *fields, **expressions):
+        assert not expressions, 'custom expressions are not implemented now'
         dataframe = self.get_dataframe(columns=fields)
         return PandasFlux(dataframe)
 
@@ -119,6 +118,7 @@ class PandasFlux(fx.RecordsFlux):
     def to_records(self, **kwargs):
         return fx.RecordsFlux(
             self.get_records(),
+            count=self.expected_count(),
         )
 
     def to_rows(self, *columns, **kwargs):
@@ -127,5 +127,5 @@ class PandasFlux(fx.RecordsFlux):
         ).to_records()
 
     def show(self, count=10):
-        print(self.class_name(), self.get_meta(), '\n')
+        self.log(['Show:', self.class_name(), self.get_meta(), '\n'])
         return self.get_dataframe().head(count)
