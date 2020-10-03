@@ -79,6 +79,15 @@ class RecordsFlux(fx.AnyFlux):
     def valid_items(items, skip_errors=False):
         return check_records(items, skip_errors)
 
+    def get_columns(self, by_rows_count=100):
+        if self.is_in_memory():
+            df = self.get_dataframe()
+        elif by_rows_count:
+            df = self.take(by_rows_count).get_dataframe()
+        else:
+            raise ValueError("Flux data isn't saved in memory and by_rows_count argument not provided")
+        return list(df.columns)
+
     def get_records(self, skip_errors=False, raise_errors=True):
         if skip_errors or raise_errors:
             return check_records(self.data, skip_errors)
@@ -177,13 +186,13 @@ class RecordsFlux(fx.AnyFlux):
             )
         return fx_groups.to_memory() if self.is_in_memory() else fx_groups
 
-    def group_by(self, *keys, values=None, step=arg.DEFAULT, as_pairs=False, verbose=True):
+    def group_by(self, *keys, values=None, step=arg.DEFAULT, as_pairs=False, take_hash=True, verbose=True):
         keys = arg.update(keys)
         step = arg.undefault(step, self.max_items_in_memory)
         if as_pairs:
             key_for_sort = keys
         else:
-            key_for_sort = get_key_function(keys, take_hash=True)
+            key_for_sort = get_key_function(keys, take_hash=take_hash)
         sorted_fx = self.sort(
             key_for_sort,
             step=step,
