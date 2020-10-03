@@ -83,9 +83,13 @@ def is_schema_row(item):
     return isinstance(item, schema.SchemaRow)
 
 
-def concat(*list_fluxes):
-    list_fluxes = arg.update(list_fluxes)
-    result = list_fluxes[0]
-    for cur_flux in list_fluxes[1:]:
-        result = result.add_flux(cur_flux)
+def concat(*iter_fluxes):
+    iter_fluxes = arg.update(iter_fluxes)
+    result = None
+    for cur_flux in iter_fluxes:
+        if result is None:
+            result = cur_flux
+        else:
+            result = result.add_flux(cur_flux)
+        gc.collect()
     return result
