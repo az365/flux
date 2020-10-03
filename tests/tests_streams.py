@@ -1,9 +1,7 @@
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
-    from utils import readers
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
-    from ..utils import readers
 
 
 EXAMPLE_FILENAME = 'test_file.tmp'
@@ -82,6 +80,23 @@ def test_filter():
     ).filter(
         lambda i: i > 5,
         lambda i: i <= 8,
+    ).get_list()
+    assert received == expected
+
+
+def test_records_filter():
+    example = [
+        dict(a=11, b=12),
+        dict(a=21, b=22),
+        dict(a=21, b=32),
+        dict(a=41, b=42),
+    ]
+    expected = example[2:3]
+    received = fx.RecordsFlux(
+        example,
+    ).filter(
+        a=21,
+        b=lambda x: x >= 30,
     ).get_list()
     assert received == expected
 
@@ -630,6 +645,7 @@ if __name__ == '__main__':
     test_map()
     test_flat_map()
     test_filter()
+    test_records_filter()
     test_take()
     test_skip()
     test_map_filter_take()

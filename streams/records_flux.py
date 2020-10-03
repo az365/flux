@@ -116,7 +116,11 @@ class RecordsFlux(fx.AnyFlux):
         )
 
     def filter(self, *fields, **expressions):
-        extended_filters_list = list(fields) + list(expressions.items())
+        expressions_list = [
+            (k, fs.equal(v) if isinstance(v, (str, int, float, bool)) else v)
+            for k, v in expressions.items()
+        ]
+        extended_filters_list = list(fields) + expressions_list
 
         def filter_function(r):
             for f in extended_filters_list:
