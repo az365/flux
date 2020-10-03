@@ -259,7 +259,10 @@ class AnyFlux:
     def calc(self, function):
         return function(self.data)
 
-    def apply(self, function, native=True, save_count=False):
+    def lazy_calc(self, function):
+        yield from function(self.date)
+
+    def apply(self, function, native=True, save_count=False, lazy=True):
         if native:
             target_class = self.__class__
             props = self.get_meta() if save_count else self.get_meta_except_count()
@@ -267,7 +270,7 @@ class AnyFlux:
             target_class = AnyFlux
             props = dict(count=self.count) if save_count else dict()
         return target_class(
-            self.calc(function),
+            self.lazy_calc(function) if lazy else self.calc(function),
             **props
         )
 
@@ -745,7 +748,7 @@ class AnyFlux:
         self.log([self.class_name(), self.get_meta()], end='\n', verbose=True)
         if self.is_in_memory():
             for i in self.get_items()[:count]:
-                self.log(i, verbose=True)
+                self.log(i, end='\n', verbose=True)
         else:
             self.log(self.one(), end='\n', verbose=True)
 
