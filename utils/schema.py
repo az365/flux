@@ -17,6 +17,7 @@ class FieldType(Enum):
     Str256 = 'str256'
     Int = 'int'
     Float = 'float'
+    IsoDate = 'date'
     Bool = 'bool'
     Tuple = 'tuple'
     Dict = 'dict'
@@ -31,7 +32,7 @@ def any_to_bool(value):
 
 def safe_converter(converter, default_value=0):
     def func(value):
-        if value == '':
+        if value is None or value == '':
             return default_value
         else:
             try:
@@ -51,6 +52,7 @@ FIELD_TYPES = {
     FieldType.Str256.value: dict(py=str, pg='varchar(256)', ch='FixedString(256)', str_to_py=str),
     FieldType.Int.value: dict(py=int, pg='int', ch='Int32', str_to_py=safe_converter(int)),
     FieldType.Float.value: dict(py=float, pg='numeric', ch='Float32', str_to_py=safe_converter(float)),
+    FieldType.IsoDate.value: dict(py=str, pg='date', ch='Date', str_to_py=str),
     FieldType.Bool.value: dict(py=bool, pg='bool', ch='UInt8', str_to_py=any_to_bool, py_to_ch=safe_converter(int)),
     FieldType.Tuple.value: dict(py=tuple, pg='text', str_to_py=safe_converter(eval, tuple())),
     FieldType.Dict.value: dict(py=dict, pg='text', str_to_py=safe_converter(eval, dict())),
@@ -65,11 +67,15 @@ HEURISTIC_SUFFIX_TO_TYPE = {
     'count': FieldType.Int,
     'sum': FieldType.Float,
     'avg': FieldType.Float,
+    'mean': FieldType.Float,
     'share': FieldType.Float,
     'norm': FieldType.Float,
     'weight': FieldType.Float,
     'value': FieldType.Float,
+    'score': FieldType.Float,
     'coef': FieldType.Float,
+    'abs': FieldType.Float,
+    'rel': FieldType.Float,
     'is': FieldType.Bool,
     'has': FieldType.Bool,
     None: FieldType.Str,
