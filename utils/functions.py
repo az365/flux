@@ -2,12 +2,14 @@ try:  # Assume we're a sub-module in a package.
     import fluxes as fx
     from utils import (
         arguments as arg,
+        mappers as ms,
         selection,
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
     from ..utils import (
         arguments as arg,
+        mappers as ms,
         selection,
     )
 
@@ -252,3 +254,34 @@ def shifted_func(func):
             result.append(stat)
         return result
     return func_
+
+
+def unfold_lists(fields, numer_field='n', default_value=0):
+    def func(record):
+        yield from ms.unfold_lists(record, fields=fields, number_field=number_field, default_value=default_value)
+    return func
+
+
+def compare_lists(a_field='a_only', b_field='b_only', ab_field='common', as_dict=True):
+    def func(list_a, list_b):
+        items_common, items_a_only, items_b_only = list(), list(), list()
+        for item in list_a:
+            if item in list_b:
+                items_common.append(item)
+            else:
+                items_a_only.append(item)
+        for item in list_b:
+            if item not in list_a:
+                items_b_only.append(item)
+        result = ((a_field, items_a_only), (b_field, items_b_only), (ab_field, items_common))
+        if as_dict:
+            return dict(result)
+        else:
+            return result
+    return func
+
+
+def list_minus():
+    def func(list_a, list_b):
+        return [i for i in list_a if i not in list_b]
+    return func
