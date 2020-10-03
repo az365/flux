@@ -485,6 +485,11 @@ class CsvFile(TextFile):
             self.schema = schema
         return schema
 
+    def add_fields(self, *fields, default_type=None, return_file=True):
+        self.schema.add_fields(*fields, default_type=default_type, return_schema=False)
+        if return_file:
+            return self
+
     def get_columns(self):
         return self.get_schema().get_columns()
 

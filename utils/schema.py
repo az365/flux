@@ -195,6 +195,12 @@ class SchemaDescription:
             raise TypeError
         self.fields_descriptions.append(field_desc)
 
+    def add_fields(self, *fields, default_type=None, return_schema=True):
+        for f in fields:
+            self.append_field(f, default_type=default_type)
+        if return_schema:
+            return self
+
     def get_fields_count(self):
         return len(self.fields_descriptions)
 
@@ -243,6 +249,9 @@ class SchemaDescription:
             if not isinstance(value, field_type):
                 return False
         return True
+
+    def copy(self):
+        return SchemaDescription(self.fields_descriptions)
 
 
 class SchemaRow:
