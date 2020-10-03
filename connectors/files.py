@@ -451,7 +451,10 @@ class CsvFile(TextFile):
     def get_schema(self):
         return self.schema
 
-    def set_schema(self, schema):
+    def get_schema_str(self, dialect='pg'):
+        return self.schema.get_schema_str(dialect=dialect)
+
+    def set_schema(self, schema, return_file=True):
         if schema is None:
             self.schema = None
         elif isinstance(schema, sh.SchemaDescription):
@@ -470,6 +473,8 @@ class CsvFile(TextFile):
         else:
             message = 'schema must be SchemaDescription of tuple with fields_description (got {})'.format(type(schema))
             raise TypeError(message)
+        if return_file:
+            return self
 
     def detect_schema_by_title_row(self, set_schema=False, verbose=AUTO):
         assert self.first_line_is_title, 'Can detect schema by title row only if first line is a title row'
