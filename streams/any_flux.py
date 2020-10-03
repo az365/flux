@@ -260,7 +260,7 @@ class AnyFlux:
         return function(self.data)
 
     def lazy_calc(self, function):
-        yield from function(self.date)
+        yield from function(self.data)
 
     def apply(self, function, native=True, save_count=False, lazy=True):
         if native:
