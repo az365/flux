@@ -6,6 +6,7 @@ try:  # Assume we're a sub-module in a package.
     import conns as cs
     from utils import (
         arguments as arg,
+        schema as sh,
         log_progress,
     )
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
@@ -13,6 +14,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     from . import conns as cs
     from .utils import (
         arguments as arg,
+        schema as sh,
         log_progress,
     )
 
@@ -44,6 +46,7 @@ class FluxContext:
 
         self.fx = fx
         self.cs = cs
+        self.sh = sh
 
     def get_context(self):
         return self
