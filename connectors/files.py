@@ -570,6 +570,18 @@ class CsvFile(TextFile):
             flux.set_name(name)
         return flux
 
+    def select(self, *args, **kwargs):
+        return self.to_records_flux().select(*args, **kwargs)
+
+    def filter(self, *args, **kwargs):
+        return self.to_records_flux().filter(*args, **kwargs)
+
+    def take(self, count):
+        return self.to_records_flux().take(count)
+
+    def to_memory(self):
+        return self.to_records_flux().to_memory()
+
     def write_rows(self, rows, verbose=AUTO):
         def get_rows_with_title():
             if self.first_line_is_title:
