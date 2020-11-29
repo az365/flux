@@ -83,11 +83,19 @@ def not_equal(other):
     return func
 
 
-def is_in(list_values):
+def is_in(*list_values):
     list_values = arg.update(list_values)
 
     def func(value):
         return value in list_values
+    return func
+
+
+def not_in(*list_values):
+    list_values = arg.update(list_values)
+
+    def func(value):
+        return value not in list_values
     return func
 
 
@@ -96,6 +104,15 @@ def is_in_sample(sample_rate, sample_bucket=1, as_str=True, hash_func=hash):
         if as_str:
             elem_id = str(elem_id)
         return hash_func(elem_id) % sample_rate == sample_bucket
+    return func
+
+
+def between(min_value, max_value, including=False):
+    def func(value):
+        if including:
+            return min_value <= value <= max_value
+        else:
+            return min_value < value < max_value
     return func
 
 
@@ -256,7 +273,7 @@ def shifted_func(func):
     return func_
 
 
-def unfold_lists(fields, numer_field='n', default_value=0):
+def unfold_lists(fields, number_field='n', default_value=0):
     def func(record):
         yield from ms.unfold_lists(record, fields=fields, number_field=number_field, default_value=default_value)
     return func
