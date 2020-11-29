@@ -235,6 +235,16 @@ class AnyFlux:
             result += 1
         return result
 
+    def get_count(self, in_memory=False, final=False):
+        if in_memory:
+            self.data = self.get_list()
+            self.count = len(self.data)
+            return self.count
+        elif final:
+            return self.final_count()
+        else:
+            return self.expected_count()
+
     def tee(self, n=2):
         return [
             self.__class__(
