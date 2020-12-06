@@ -15,19 +15,23 @@ def set_min_year(year):
     MIN_YEAR = year
 
 
-def get_date(d, return_is_it_iso_date=False):
+def check_iso_date(d):
+    if isinstance(d, str):
+        return list(map(len, d.split('-'))) == [4, 2, 2]
+
+
+def raise_date_type_error(d):
+    raise TypeError('Argument must be date in iso-format as str or python date (got {})'.format(type(d)))
+
+
+def get_date(d):
+    is_iso_date = check_iso_date(d)
     if isinstance(d, date):
-        cur_date = d
-        is_iso_date = False
-    elif isinstance(d, str):
-        cur_date = date.fromisoformat(d)
-        is_iso_date = True
+        return d
+    elif is_iso_date:
+        return date.fromisoformat(d)
     else:
-        raise TypeError('Argument must be date in iso-format as str or python date (got {})'.format(type(d)))
-    if return_is_it_iso_date:
-        return cur_date, is_iso_date
-    else:
-        return cur_date
+        raise_date_type_error(d)
 
 
 def to_date(d, as_iso_date=False):
@@ -39,9 +43,9 @@ def to_date(d, as_iso_date=False):
 
 
 def get_monday_date(d, as_iso_date=None):
-    cur_date, is_iso_date = get_date(d, return_is_it_iso_date=True)
+    cur_date = get_date(d)
     if as_iso_date is None:
-        as_iso_date = is_iso_date
+        as_iso_date = check_iso_date(d)
     monday_date = cur_date + timedelta(days=-cur_date.weekday())
     return to_date(monday_date, as_iso_date)
 
