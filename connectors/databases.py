@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from enum import Enum
+import gc
 import requests
 import psycopg2
+import psycopg2.extras
 
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
@@ -30,6 +32,7 @@ COMMON_PROPS = ['verbose', ]
 TEST_QUERY = 'SELECT now()'
 DEFAULT_GROUP = 'PUBLIC'
 DEFAULT_STEP = 1000
+DEFAULT_ERRORS_THRESHOLD = 0.05
 
 
 class DatabaseType(Enum):
@@ -257,7 +260,7 @@ class AbstractDatabase(ABC):
             fx_input = data
         elif cs.is_file(data):
             fx_input = data.to_schema_flux()
-            assert fx_input.get_columns() == sh.SchemaDescription(schema).get_columns()
+            assert fx_input.get_columns() == schema.get_columns()
         elif isinstance(data, str):
             fx_input = fx.RowsFlux.from_csv_file(
                 filename=data,
@@ -296,7 +299,7 @@ class AbstractDatabase(ABC):
         verbose = arg.undefault(verbose, self.verbose)
         if not skip_lines:
             self.create_table(table, schema=schema, drop_if_exists=True, verbose=verbose)
-        skip_errors = (max_error_rate is None) or (max_error_rate > 0)
+        skip_errors = (max_error_rate is None) or (max_error_rate > DEFAULT_ERRORS_THRESHOLD)
         initial_count, write_count = self.insert_data(
             table, schema=schema, data=data,
             encoding=encoding, skip_first_line=skip_first_line,
@@ -408,6 +411,11 @@ class PostgresDatabase(AbstractDatabase):
         if get_data:
             return result
 
+    def execute_batch(self, query, batch, step=DEFAULT_STEP, cursor=AUTO):
+        if cursor == AUTO:
+            cursor = self.connect().cursor()
+        psycopg2.extras.execute_batch(cursor, query, batch, page_size=step)
+
     def grant_permission(self, name, permission='SELECT', group=DEFAULT_GROUP, verbose=arg.DEFAULT):
         verbose = arg.undefault(verbose, self.verbose)
         message = 'Grant access:'
@@ -447,32 +455,45 @@ class PostgresDatabase(AbstractDatabase):
         count = len(rows) if isinstance(rows, (list, tuple)) else expected_count
         conn = self.connect(reconnect=True)
         cur = conn.cursor()
-        placeholders = ['%s' for _ in columns]
-        query = 'INSERT INTO {table} ({columns}) VALUES ({values})'.format(
-            table=table,
-            columns=', '.join(columns),
-            values=', '.join(placeholders),
-        )
+        use_fast_batch_method = not skip_errors
+        query_args = dict(table=table)
+        if use_fast_batch_method:
+            query_template = 'INSERT INTO {table} VALUES ({values});'
+            placeholders = ['%({})s'.format(c) for c in columns]
+        elif skip_errors:
+            query_template = 'INSERT INTO {table} ({columns}) VALUES ({values})'
+            placeholders = ['%s' for _ in columns]
+            query_args['columns'] = ', '.join(columns)
+        query_args['values'] = ', '.join(placeholders)
+        query = query_template.format(**query_args)
         message = verbose if isinstance(verbose, str) else 'Committing {}-rows batches into {}'.format(step, table)
         progress = log_progress.Progress(
             message, count=count, verbose=verbose, logger=self.get_logger(), context=self.context,
         )
         progress.start()
+        records_batch = list()
         n = 0
         for n, row in enumerate(rows):
-            if skip_errors:
+            if use_fast_batch_method:
+                current_record = {k: v for k, v in zip(columns, row)}
+                records_batch.append(current_record)
+            elif skip_errors:
                 try:
                     cur.execute(query, row)
                 except TypeError or IndexError as e:  # TypeError: not all arguments converted during string formatting
                     self.log(['Error line:', str(row)], level=log_progress.LoggingLevel.Debug, verbose=verbose)
                     self.log([e.__class__.__name__, e], level=log_progress.LoggingLevel.Error)
-            else:
-                cur.execute(query, row)
             if (n + 1) % step == 0:
+                if use_fast_batch_method:
+                    self.execute_batch(query, records_batch, step, cursor=cur)
+                    records_batch = list()
                 if not progress.position:
                     progress.update(0)
                 conn.commit()
                 progress.update(n)
+                gc.collect()
+        if use_fast_batch_method:
+            self.execute_batch(query, records_batch, step, cursor=cur)
         conn.commit()
         progress.finish(n)
         if return_count:
