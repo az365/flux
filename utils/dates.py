@@ -42,6 +42,15 @@ def to_date(d, as_iso_date=False):
         return cur_date
 
 
+def get_month_first_date(d):
+    if check_iso_date(d):
+        return d[:8] + '01'
+    elif isinstance(d, date):
+        return date(d.year, d.month, 1)
+    else:
+        raise_date_type_error(d)
+
+
 def get_monday_date(d, as_iso_date=None):
     cur_date = get_date(d)
     if as_iso_date is None:
@@ -54,6 +63,19 @@ def get_year_start_monday(year, as_iso_date=True):
     year_start_date = date(year, 1, 1)
     year_start_monday = year_start_date + timedelta(days=-year_start_date.weekday())
     return to_date(year_start_monday, as_iso_date)
+
+
+def get_next_year_date(d, increment=1, round_to_monday=False):
+    is_iso_format = check_iso_date(d)
+    if is_iso_format:
+        dt = date.fromisoformat(d)
+        dt = '{:04}-{:02}-{:02}'.format(dt.year + increment, dt.month, dt.day)
+    elif isinstance(d, date):
+        dt = date(d.year + increment, d.month, d.day)
+    if round_to_monday:
+        return get_monday_date(dt, is_iso_format)
+    else:
+        return dt
 
 
 def get_weeks_between(a, b, round_to_mondays=False):
