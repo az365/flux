@@ -1,3 +1,4 @@
+from abc import abstractmethod
 import io
 import boto3
 
@@ -10,7 +11,6 @@ try:  # Assume we're a sub-module in a package.
         arguments as arg,
         log_progress,
     )
-    # from connectors import abstract as ac
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import context as fc
     from .. import fluxes as fx
@@ -20,71 +20,114 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
         arguments as arg,
         log_progress,
     )
-    # from ..connectors import abstract as ac
 
 
 AUTO = arg.DEFAULT
 CHUNK_SIZE = 8192
-PATH_DELIMITER = '/'
+DEFAULT_PATH_DELIMITER = '/'
+FIRST_PATH_DELIMITER = '://'
+DEFAULT_S3_ENDPOINT_URL = 'https://storage.yandexcloud.net'
 
 
-class S3Storage(ac.AbstractConnector):
+class AbstractObjectStorage(ac.AbstractStorage):
     def __init__(
             self,
-            service_name='s3',
-            path_prefix='s3://',
-            endpoint_url='https://storage.yandexcloud.net',
+            name,
+            context,
+            verbose=True,
+    ):
+        super().__init__(
+            name=name,
+            context=context,
+            verbose=verbose,
+        )
+
+    @abstractmethod
+    def get_default_child_class(self):
+        pass
+
+    @abstractmethod
+    def get_service_name(self):
+        pass
+
+    def get_path_prefix(self):
+        return self.get_service_name() + FIRST_PATH_DELIMITER
+
+    def get_path_delimiter(self):
+        return DEFAULT_PATH_DELIMITER
+
+
+class S3Storage(ac.AbstractObjectStorage):
+    def __init__(
+            self,
+            name='s3',
+            endpoint_url=DEFAULT_S3_ENDPOINT_URL,
             access_key=None,
             secret_key=None,
             context=None,
+            verbose=True,
     ):
-        self.service_name = service_name
-        self.path_prefix = path_prefix
+        super().__init__(
+            name=name,
+            context=context,
+            verbose=verbose,
+        )
         self.endpoint_url = endpoint_url
         self.access_key = access_key
         self.secret_key = secret_key
-        self.context = context
-        self.buckets = dict()
+
+    @staticmethod
+    def get_service_name():
+        return 's3'
+
+    def get_default_path_delimiter(self):
+        return
+
+    @staticmethod
+    def get_default_child_class():
+        return S3Bucket
+
+    def get_buckets(self):
+        return self.children
 
     def bucket(self, name, access_key=AUTO, secret_key=AUTO):
-        bucket = self.buckets.get(name)
+        bucket = self.get_buckets().get(name)
         if not bucket:
             bucket = S3Bucket(
-                path=self.path_prefix + PATH_DELIMITER + name,
-                storage=self.storage,
+                name=name,
+                storage=self,
                 access_key=arg.undefault(access_key, self.access_key),
                 secret_key=arg.undefault(secret_key, self.secret_key),
             )
         return bucket
 
 
-class S3Bucket(ac.AbstractFolder):
+class S3Bucket(ac.FlatFolder):
     def __init__(
             self,
-            path,
-            context=None,
+            name,
+            storage,
             verbose=True,
-            storage=None,
-            access_key=None,
-            secret_key=None,
+            access_key=AUTO,
+            secret_key=AUTO,
     ):
         super().__init__(
-            path=path,
-            context=context,
-            verbose=verbose
+            name=name,
+            parent=storage,
+            verbose=verbose,
         )
         self.storage = storage
-        self.access_key = access_key
-        self.secret_key = secret_key
+        self.access_key = arg.undefault(access_key, self.get_storage().access_key)
+        self.secret_key = arg.undefault(secret_key, self.get_storage().secret_key)
         self.session = None
         self.client = None
         self.resource = None
 
-    def get_name(self):
-        return self.get_path_as_list()[0]
+    def get_default_child_class(self):
+        return S3Folder
 
-    def get_delimiter(self):
-        return PATH_DELIMITER
+    def folder(self, name, **kwargs):
+        self.child(name, kwargs)
 
     def get_session(self, props=None):
         if not self.session:
@@ -125,17 +168,13 @@ class S3Bucket(ac.AbstractFolder):
             )
         self.resource = self.get_session().resource(**props)
 
-
-    def get_path_in_bucket(self):
-        return self.get_path_as_list()[1:]
-
     def list_objects(self, params=None, v2=False, field='Contents'):
         if not params:
             params = dict()
         if 'Bucket' not in params:
-            params['Bucket'] = self.get_bucket_name()
+            params['Bucket'] = self.get_name()
         if 'Delimiter' not in params:
-            params['Delimiter'] = PATH_DELIMITER
+            params['Delimiter'] = self.get_path_delimiter()
         session = self.get_session()
         if v2:
             objects = session.list_objects_v2(**params)
@@ -162,10 +201,66 @@ class S3Bucket(ac.AbstractFolder):
     def list_prefixes(self):
         return self.list_objects('CommonPrefixes')
 
-    def get_object(self, object_path):
-        return self.get_resource().Object(self.get_bucket_name(), object_path)
+    def get_object(self, object_path_in_bucket):
+        return self.get_resource().Object(self.get_bucket_name(), object_path_in_bucket)
 
-    def get_buffer(self, object_path):
+    def get_buffer(self, object_path_in_bucket):
         buffer = io.BytesIO()
-        self.get_object(object_path).download_fileobj(buffer)
+        self.get_object(object_path_in_bucket).download_fileobj(buffer)
         return buffer
+
+
+class S3Folder(ac.FlatFolder):
+    def __init__(
+            self,
+            name,
+            bucket,
+            verbose=AUTO,
+    ):
+        super().__init__(
+            name=name,
+            parent=bucket,
+            verbose=verbose,
+        )
+
+    def get_default_child_class(self):
+        return S3Object
+
+    def get_bucket(self):
+        return self.parent
+
+    def object(self, name):
+        return self.child(name, folder=self)
+
+    def get_buffer(self, object_path_in_bucket):
+        return self.get_bucket().get_buffer(object_path_in_bucket)
+
+
+class S3Object(ac.LeafConnector):
+    def __init__(
+            self,
+            name,
+            folder,
+            verbose=AUTO,
+    ):
+        assert isinstance(folder, S3Folder)
+        super().__init__(
+            name=name,
+            parent=folder,
+        )
+        self.verbose = arg.undefault(verbose, folder.verbose)
+
+    def get_folder(self):
+        return self.parent
+
+    def get_bucket(self):
+        return self.get_folder().get_bucket()
+
+    def get_object_path_in_bucket(self):
+        return self.get_folder().get_name() + self.get_path_delimiter() + self.get_name()
+
+    def get_buffer(self):
+        return self.get_folder().get_buffer(self.get_object_path_in_bucket())
+
+    def get_data(self):
+        return self.get_buffer()
