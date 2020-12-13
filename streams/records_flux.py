@@ -53,6 +53,7 @@ class RecordsFlux(fx.AnyFlux):
             self,
             data,
             count=None,
+            less_than=None,
             check=True,
             source=None,
             context=None,
@@ -63,6 +64,7 @@ class RecordsFlux(fx.AnyFlux):
         super().__init__(
             check_records(data) if check else data,
             count=count,
+            less_than=less_than,
             source=source,
             context=context,
             max_items_in_memory=max_items_in_memory,
@@ -156,7 +158,7 @@ class RecordsFlux(fx.AnyFlux):
     ):
         key_function = get_key_function(keys)
         step = arg.undefault(step, self.max_items_in_memory)
-        if self.is_in_memory() or (step is None) or (self.count is not None and self.count <= step):
+        if self.can_be_in_memory():
             return self.memory_sort(key_function, reverse, verbose=verbose)
         else:
             return self.disk_sort(key_function, reverse, step=step, verbose=verbose)
@@ -184,7 +186,11 @@ class RecordsFlux(fx.AnyFlux):
             fx_groups = fx_groups.map_to_records(
                 lambda r: ms.fold_lists(r, keys, values),
             )
-        return fx_groups.to_memory() if self.is_in_memory() else fx_groups
+        if self.is_in_memory():
+            return fx_groups.to_memory()
+        else:
+            fx_groups.less_than = self.count or self.less_than
+            return fx_groups
 
     def group_by(self, *keys, values=None, step=arg.DEFAULT, as_pairs=False, take_hash=True, verbose=True):
         keys = arg.update(keys)
@@ -214,7 +220,8 @@ class RecordsFlux(fx.AnyFlux):
     def to_lines(self, columns, add_title_row=False, delimiter='\t'):
         return fx.LinesFlux(
             self.to_rows(columns, add_title_row=add_title_row),
-            self.count,
+            count=self.count,
+            less_than=self.less_than,
         ).map(
             delimiter.join,
         )
@@ -236,7 +243,8 @@ class RecordsFlux(fx.AnyFlux):
             count = self.count + (1 if add_title_row else 0)
         return fx.RowsFlux(
             get_rows(list(columns)),
-            count,
+            count=count,
+            less_than=self.less_than,
         )
 
     def schematize(self, schema, skip_bad_rows=False, skip_bad_values=False, verbose=True):
@@ -258,6 +266,7 @@ class RecordsFlux(fx.AnyFlux):
         return fx.PairsFlux(
             list(get_pairs()) if self.is_in_memory() else get_pairs(),
             count=self.count,
+            less_than=self.less_than,
             secondary=fx.FluxType.RecordsFlux if value is None else fx.FluxType.AnyFlux,
             check=False,
         )

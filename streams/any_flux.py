@@ -30,6 +30,7 @@ class AnyFlux:
             self,
             data,
             count=None,
+            less_than=None,
             source=None,
             context=None,
             max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
@@ -41,6 +42,7 @@ class AnyFlux:
             self.count = len(data)
         else:
             self.count = count
+        self.less_than = less_than or self.count
         self.source = source
         if source:
             self.name = source.get_name()
@@ -245,6 +247,9 @@ class AnyFlux:
         else:
             return self.expected_count()
 
+    def estimate_count(self):
+        return self.count or self.less_than
+
     def tee(self, n=2):
         return [
             self.__class__(
@@ -287,13 +292,15 @@ class AnyFlux:
     def native_map(self, function):
         return self.__class__(
             map(function, self.get_items()),
-            self.count,
+            count=self.count,
+            less_than=self.count or self.less_than,
         )
 
     def map_to_any(self, function):
         return AnyFlux(
             map(function, self.get_items()),
-            self.count,
+            count=self.count,
+            less_than=self.count or self.less_than,
         )
 
     def map_to_records(self, function=None):
@@ -305,6 +312,7 @@ class AnyFlux:
         return fx.RecordsFlux(
             map(get_record, self.get_items()),
             count=self.count,
+            less_than=self.less_than,
             check=True,
         )
 
@@ -344,6 +352,8 @@ class AnyFlux:
         if self.is_in_memory():
             filtered_items = list(filtered_items)
             props['count'] = len(filtered_items)
+        else:
+            props['less_than'] = self.count or self.less_than
         return self.__class__(
             filtered_items,
             **props
@@ -380,7 +390,7 @@ class AnyFlux:
         )
 
     def progress(self, expected_count=arg.DEFAULT, step=arg.DEFAULT, message='Progress'):
-        count = arg.undefault(expected_count, self.count)
+        count = arg.undefault(expected_count, self.count) or self.less_than
         return self.__class__(
             self.get_logger().progress(self.data, name=message, count=count, step=step),
             **self.get_meta()
@@ -409,7 +419,10 @@ class AnyFlux:
         else:
             next_items = self.get_items()[count:] if self.is_in_memory() else skip_items(count)
         props = self.get_meta()
-        props['count'] = self.count - count if self.count else None
+        if self.count:
+            props['count'] = self.count - count
+        elif self.less_than:
+            props['less_than'] = self.less_than - count
         return self.__class__(
             next_items,
             **props
@@ -631,7 +644,7 @@ class AnyFlux:
             key_function = fs.same()
         else:
             key_function = fs.composite_key(keys)
-        if self.is_in_memory() or (step is None) or (self.count is not None and self.count <= step):
+        if self.can_be_in_memory():
             return self.memory_sort(key_function, reverse=reverse, verbose=verbose)
         else:
             return self.disk_sort(key_function, reverse=reverse, step=step, verbose=verbose)
@@ -687,7 +700,14 @@ class AnyFlux:
         return list(self.get_items())
 
     def is_in_memory(self):
-        return isinstance(self.data, list)
+        return isinstance(self.data, (list, tuple))
+
+    def can_be_in_memory(self, step=arg.DEFAULT):
+        step = arg.undefault(step, self.max_items_in_memory)
+        if self.is_in_memory() or step is None:
+            return True
+        else:
+            return self.estimate_count() is not None and self.estimate_count() <= step
 
     def to_memory(self):
         items_as_list_in_memory = self.get_list()
@@ -710,16 +730,18 @@ class AnyFlux:
         return fx.AnyFlux(
             self.get_items(),
             count=self.count,
+            less_than=self.less_than,
         )
 
     def to_lines(self, **kwargs):
         return fx.LinesFlux(
             self.map_to_any(str).get_items(),
             count=self.count,
+            less_than=self.less_than,
             check=True,
         )
 
-    def to_json(self, **kwargs):
+    def to_json(self):
         return self.map_to_any(
             json.dumps
         ).to_lines()
@@ -735,6 +757,7 @@ class AnyFlux:
         return fx.RowsFlux(
             map(function, self.get_items()) if function is not None else self.get_items(),
             count=self.count,
+            less_than=self.less_than,
         )
 
     def to_pairs(self, key=fs.value_by_key(0), value=fs.value_by_key(1)):
@@ -748,6 +771,7 @@ class AnyFlux:
         return fx.PairsFlux(
             pairs_data,
             count=self.count,
+            less_than=self.less_than,
         )
 
     def to_records(self, **kwargs):

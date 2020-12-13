@@ -95,6 +95,7 @@ class SchemaFlux(fx.RowsFlux):
             self,
             data,
             count=None,
+            less_than=None,
             check=True,
             schema=None,
             source=None,
@@ -106,6 +107,7 @@ class SchemaFlux(fx.RowsFlux):
         super().__init__(
             check_rows(data, schema) if check else data,
             count=count,
+            less_than=less_than,
             check=check,
             source=source,
             context=context,
@@ -135,6 +137,7 @@ class SchemaFlux(fx.RowsFlux):
         return SchemaFlux(
             check_rows(self.data, schema=schema) if check else self.data,
             count=self.count,
+            less_than=self.less_than,
             schema=schema,
         )
 
@@ -160,6 +163,7 @@ class SchemaFlux(fx.RowsFlux):
         return SchemaFlux(
             apply_schema_to_rows(self.data),
             count=None if skip_bad_rows else self.count,
+            less_than=self.less_than,
             check=False,
             schema=schema,
         )

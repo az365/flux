@@ -32,6 +32,7 @@ class RowsFlux(fx.AnyFlux):
             self,
             data,
             count=None,
+            less_than=None,
             check=True,
             source=None,
             max_items_in_memory=fx.MAX_ITEMS_IN_MEMORY,
@@ -42,6 +43,7 @@ class RowsFlux(fx.AnyFlux):
         super().__init__(
             check_rows(data) if check else data,
             count=count,
+            less_than=less_than,
             source=source,
             context=context,
             max_items_in_memory=max_items_in_memory,

@@ -37,6 +37,7 @@ class PairsFlux(fx.RowsFlux):
             self,
             data,
             count=None,
+            less_than=None,
             check=True,
             secondary=None,
             source=None,
@@ -48,6 +49,7 @@ class PairsFlux(fx.RowsFlux):
         super().__init__(
             check_pairs(data) if check else data,
             count=count,
+            less_than=less_than,
             check=check,
             source=source,
             context=context,
