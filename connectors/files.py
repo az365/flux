@@ -209,9 +209,6 @@ class AbstractFile(ac.LeafConnector):
         folder_path = folder_obj.get_path() if isinstance(folder_obj, LocalFolder) else folder_obj
         return self.get_folder_path() in folder_path
 
-    def get_name(self):
-        return self.get_list_path()[-1]
-
     def is_opened(self):
         if self.fileholder is None:
             return False
@@ -230,7 +227,7 @@ class AbstractFile(ac.LeafConnector):
             else:
                 raise AttributeError('File {} is already opened'.format(self.get_name()))
         else:
-            self.fileholder = open(self.filename, 'r')
+            self.fileholder = open(self.get_path(), 'r')
 
     def get_meta(self):
         meta = self.__dict__.copy()
@@ -266,12 +263,12 @@ class TextFile(AbstractFile):
             else:
                 raise AttributeError('File {} is already opened'.format(self.get_name()))
         if self.gzip:
-            self.fileholder = gz.open(self.filename, mode)
+            self.fileholder = gz.open(self.get_path(), mode)
         else:
             params = dict()
             if self.encoding:
                 params['encoding'] = self.encoding
-            self.fileholder = open(self.get_path(), mode, **params) if self.encoding else open(self.get_name(), 'r')
+            self.fileholder = open(self.get_path(), mode, **params) if self.encoding else open(self.get_path(), 'r')
 
     def count_lines(self, reopen=False, chunk_size=CHUNK_SIZE, verbose=AUTO):
         verbose = arg.undefault(verbose, self.verbose)
