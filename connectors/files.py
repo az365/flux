@@ -1,4 +1,3 @@
-from abc import ABC
 from enum import Enum
 import gzip as gz
 import csv
@@ -69,66 +68,66 @@ class LocalStorage(ac.AbstractStorage):
         return self.path_delimiter
 
 
-class LocalFolder:
+class LocalFolder(ac.FlatFolder):
     def __init__(
             self,
             path,
-            context=None,
-            verbose=True,
+            storage=LocalStorage(),
+            verbose=AUTO,
     ):
-        self.path = path
-        self.files = dict()
-        self.context = context
-        self.verbose = verbose
+        assert isinstance(storage, LocalStorage)
+        super().__init__(
+            name=path,
+            parent=storage,
+            verbose=verbose,
+        )
 
-    def get_context(self):
-        return self.context
+    def get_default_child_class(self):
+        return TextFile
 
-    def get_logger(self):
-        if self.get_context():
-            return self.get_context().get_logger()
-        else:
-            return log_progress.get_logger()
+    @staticmethod
+    def get_child_class_by_filetype(filetype):
+        return cs.get_class(filetype)
 
-    def log(self, msg, level=AUTO, end=AUTO, verbose=True):
-        logger = self.get_logger()
-        if logger is not None:
-            logger.log(
-                msg=msg, level=level,
-                end=end, verbose=verbose,
-            )
+    @staticmethod
+    def get_file_type_by_name(name):
+        file_ext = name.split('.')[-1]
+        return cs.DICT_EXT_TO_TYPE.get(file_ext, cs.ConnType.TextFile)
 
-    def get_path(self):
-        return self.path
+    def get_child_class_by_name(self, name):
+        supposed_type = self.get_file_type_by_name(name)
+        return self.get_child_class_by_filetype(supposed_type)
+
+    def get_child_class_by_name_and_type(self, name, filetype=AUTO):
+        supposed_type = self.get_file_type_by_name(name)
+        filetype = arg.undefault(filetype, supposed_type)
+        return self.get_child_class_by_filetype(filetype)
+
+    def get_files(self):
+        return self.get_items()
 
     def file(self, name, filetype=AUTO, **kwargs):
         file = self.files.get(name)
         if kwargs or not file:
             filename = kwargs.pop('filename', name)
-            file_ext = filename.split('.')[-1]
-            supposed_type = cs.DICT_EXT_TO_TYPE.get(file_ext, cs.ConnType.TextFile)
-            filetype = arg.undefault(filetype, supposed_type)
-            file_class = cs.get_class(filetype)
+            file_class = self.get_child_class_by_name_and_type(name, filetype)
             file = file_class(filename, folder=self, **kwargs)
-            self.files[name] = file
+            self.get_files()[name] = file
         return file
 
     def add_file(self, name, file):
         assert cs.is_file(file), 'file must be an instance of *File (got {})'.format(type(file))
         assert name not in self.files, 'file with name {} is already registered'.format(name)
-        self.files[name] = file
-
-    def get_items(self):
-        return self.files
+        self.get_files()[name] = file
 
     def get_links(self):
-        for item in self.files:
+        for item in self.get_files():
             yield from item.get_links()
 
     def close(self, name=None):
         closed_count = 0
         if name:
-            file = self.files.get(name)
+            file = self.get_files().get(name)
             if file:
                 closed_count += file.close() or 0
         else:
@@ -142,53 +141,33 @@ class LocalFolder:
         return meta
 
 
-class AbstractFile(ABC):
+class AbstractFile(ac.LeafConnector):
     def __init__(
             self,
             filename,
             folder=None,
-            context=None,
             verbose=AUTO,
     ):
-        self.filename = filename
-        self.fileholder = None
         if folder:
             message = 'only LocalFolder supported for *File instances (got {})'.format(type(folder))
             assert cs.is_folder(folder), message
-            self.folder = folder
-        elif context:
-            assert isinstance(context, fc.FluxContext)
-            self.folder = context.get_job_folder()
-            self.folder.add_file(filename, self)
-        else:
-            self.folder = None
-        self.verbose = arg.undefault(verbose, self.folder.verbose if self.folder else True)
+        super().__init__(
+            name=filename,
+            parent=folder,
+        )
+        self.fileholder = None
+        self.verbose = arg.undefault(verbose, self.get_folder().verbose if self.get_folder() else True)
         self.links = list()
 
-    def get_context(self):
-        if self.folder:
-            return self.folder.get_context()
-
-    def get_logger(self):
-        if self.folder:
-            return self.folder.get_logger()
-        else:
-            return log_progress.get_logger()
-
-    def log(self, msg, level=AUTO, end=AUTO, verbose=True):
-        logger = self.get_logger()
-        if logger is not None:
-            logger.log(
-                msg=msg, level=level,
-                end=end, verbose=verbose,
-            )
+    def get_folder(self):
+        return self.parent
 
     def get_links(self):
         return self.links
 
     def add_to_folder(self, folder, name=arg.DEFAULT):
         assert isinstance(folder, LocalFolder), 'Folder must be a LocalFolder (got {})'.format(type(folder))
-        name = arg.undefault(name, self.filename)
+        name = arg.undefault(name, self.get_name())
         folder.add_file(self, name)
 
     @staticmethod
@@ -200,30 +179,30 @@ class AbstractFile(ABC):
         return fx.get_class(cls.get_flux_type())
 
     def is_directly_in_parent_folder(self):
-        return '/' in self.filename
+        return self.get_path_delimiter() in self.get_name()
 
     def has_path_from_root(self):
-        return self.filename.startswith('/') or ':' in self.filename
+        return self.get_name().startswith(self.get_path_delimiter()) or ':' in self.get_name()
 
     def get_path(self):
-        if self.has_path_from_root() or not self.folder:
-            return self.filename
+        if self.has_path_from_root() or not self.get_folder():
+            return self.get_name()
         else:
-            folder_path = self.folder.get_path()
+            folder_path = self.get_folder().get_path()
             if '{}' in folder_path:
-                return folder_path.format(self.filename)
-            elif folder_path.endswith('/'):
-                return folder_path + self.filename
+                return folder_path.format(self.get_name())
+            elif folder_path.endswith(self.get_path_delimiter()):
+                return folder_path + self.get_name()
             elif folder_path:
-                return '{}/{}'.format(folder_path, self.filename)
+                return '{}{}{}'.format(folder_path, self.get_path_delimiter(), self.get_name())
             else:
                 return self.filename
 
     def get_list_path(self):
-        return self.get_path().split('/')
+        return self.get_path().split(self.get_path_delimiter())
 
     def get_folder_path(self):
-        return '/'.join(self.get_list_path()[:-1])
+        return self.get_path_delimiter().join(self.get_list_path()[:-1])
 
     def is_inside_folder(self, folder=AUTO):
         folder_obj = arg.undefault(folder, self.folder)
@@ -249,7 +228,7 @@ class AbstractFile(ABC):
             if reopen:
                 self.close()
             else:
-                raise AttributeError('File {} is already opened'.format(self.filename))
+                raise AttributeError('File {} is already opened'.format(self.get_name()))
         else:
             self.fileholder = open(self.filename, 'r')
 
@@ -268,43 +247,40 @@ class TextFile(AbstractFile):
             end='\n',
             expected_count=AUTO,
             folder=None,
-            context=None,
             verbose=AUTO,
     ):
         super().__init__(
             filename=filename,
             folder=folder,
-            context=context,
             verbose=verbose,
         )
         self.gzip = gzip
         self.encoding = encoding
         self.end = end
         self.count = expected_count
-        self.fileholder = None
 
     def open(self, mode='r', reopen=False):
         if self.is_opened():
             if reopen:
                 self.close()
             else:
-                raise AttributeError('File {} is already opened'.format(self.filename))
+                raise AttributeError('File {} is already opened'.format(self.get_name()))
         if self.gzip:
             self.fileholder = gz.open(self.filename, mode)
         else:
             params = dict()
             if self.encoding:
                 params['encoding'] = self.encoding
-            self.fileholder = open(self.get_path(), mode, **params) if self.encoding else open(self.filename, 'r')
+            self.fileholder = open(self.get_path(), mode, **params) if self.encoding else open(self.get_name(), 'r')
 
     def count_lines(self, reopen=False, chunk_size=CHUNK_SIZE, verbose=AUTO):
         verbose = arg.undefault(verbose, self.verbose)
-        self.log('Counting lines in {}...'.format(self.filename), end='\r', verbose=verbose)
+        self.log('Counting lines in {}...'.format(self.get_name()), end='\r', verbose=verbose)
         self.open(reopen=reopen)
         count_n = sum(chunk.count('\n') for chunk in iter(lambda: self.fileholder.read(chunk_size), ''))
         self.count = count_n + 1
         self.close()
-        self.log('Detected {} lines in {}.'.format(self.count, self.filename), end='\r', verbose=verbose)
+        self.log('Detected {} lines in {}.'.format(self.count, self.get_name()), end='\r', verbose=verbose)
         return self.count
 
     def get_count(self, reopen=True):
@@ -414,7 +390,6 @@ class JsonFile(TextFile):
             schema=AUTO,
             default_value=None,
             folder=None,
-            context=None,
             verbose=AUTO,
     ):
         super().__init__(
@@ -423,7 +398,6 @@ class JsonFile(TextFile):
             gzip=gzip,
             expected_count=expected_count,
             folder=folder,
-            context=context,
             verbose=verbose,
         )
         self.schema = schema
@@ -461,7 +435,6 @@ class CsvFile(TextFile):
             expected_count=AUTO,
             schema=AUTO,
             folder=None,
-            context=None,
             verbose=AUTO
     ):
         super().__init__(
@@ -471,7 +444,6 @@ class CsvFile(TextFile):
             end=end,
             expected_count=expected_count,
             folder=folder,
-            context=context,
             verbose=verbose,
         )
         self.delimiter = delimiter
@@ -653,7 +625,6 @@ class TsvFile(CsvFile):
             expected_count=AUTO,
             schema=AUTO,
             folder=None,
-            context=None,
             verbose=AUTO
     ):
         super().__init__(
@@ -666,6 +637,5 @@ class TsvFile(CsvFile):
             expected_count=expected_count,
             schema=schema,
             folder=folder,
-            context=context,
             verbose=verbose,
         )
