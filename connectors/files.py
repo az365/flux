@@ -7,6 +7,7 @@ try:  # Assume we're a sub-module in a package.
     import context as fc
     import fluxes as fx
     import conns as cs
+    from connectors import abstract as ac
     from utils import (
         arguments as arg,
         functions as fs,
@@ -18,6 +19,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     from .. import context as fc
     from .. import fluxes as fx
     from .. import conns as cs
+    from ..connectors import abstract as ac
     from ..utils import (
         arguments as arg,
         functions as fs,
@@ -29,6 +31,7 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
 
 AUTO = arg.DEFAULT
 CHUNK_SIZE = 8192
+PATH_DELIMITER = '/'
 
 
 class FileType(Enum):
@@ -36,6 +39,34 @@ class FileType(Enum):
     JsonFile = 'JsonFile'
     CsvFile = 'CsvFile'
     TsvFile = 'TsvFile'
+
+
+class LocalStorage(ac.AbstractStorage):
+    def __init__(
+            self,
+            name='filesystem',
+            context=None,
+            verbose=True,
+            path_delimiter=PATH_DELIMITER,
+    ):
+        super().__init__(
+            name=name,
+            context=context,
+            verbose=verbose,
+        )
+        self.path_delimiter = path_delimiter
+
+    def get_default_child_class(self):
+        return LocalFolder
+
+    def get_folders(self):
+        return self.children
+
+    def folder(self, name, path=AUTO, **kwargs):
+        return self.child(name, path, **kwargs)
+
+    def get_path_delimiter(self):
+        return self.path_delimiter
 
 
 class LocalFolder:
