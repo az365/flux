@@ -95,24 +95,168 @@ class AbstractConnector(ABC):
         return meta
 
 
-class AbstractFolder:
+class LeafConnector(AbstractConnector):
     def __init__(
             self,
-            path,
+            name,
+            parent=None,
     ):
-        self.path = path
+        super().__init__(
+            name=name,
+            parent=parent,
+        )
 
-    def get_path(self):
-        return self.path
+    def is_root(self):
+        return False
 
-    def get_path_as_list(self, delimiter=AUTO):
-        path_delimiter = arg.undefault(delimiter, self.get_delimiter())
-        return self.get_path().split(path_delimiter)
+    def has_hierarchy(self):
+        return False
 
-    def get_delimiter(self):
-        return DEFAULT_PATH_DELIMITER
+
+class HierarchicConnector(AbstractConnector):
+    def __init__(
+            self,
+            name,
+            parent=None,
+    ):
+        super().__init__(
+            name=name,
+            parent=parent,
+        )
+        self.children = dict()
+
+    def has_hierarchy(self):
+        return True
+
+    @abstractmethod
+    def get_default_child_class(self):
+        pass
+
+    def get_child_class_by_name(self, name):
+        return self.get_default_child_class()
+
+    def child(self, name, **kwargs):
+        cur_child = self.children.get(name)
+        if not cur_child:
+            child_class = self.get_child_class_by_name(name)
+            cur_child = child_class(name, **kwargs)
+            self.children[name] = cur_child
+        return cur_child
+
+    def get_items(self):
+        return self.children
 
     def get_meta(self):
-        meta = self.__dict__.copy()
-        meta.pop('files')
+        meta = super().get_meta()
+        meta.pop('children')
         return meta
+
+
+class AbstractStorage(HierarchicConnector):
+    def __init__(
+            self,
+            name,
+            context,
+            verbose=True,
+    ):
+        super().__init__(
+            name=name,
+            parent=context,
+        )
+        self.verbose = verbose
+
+    def is_root(self):
+        return True
+
+    @abstractmethod
+    def get_default_child_class(self):
+        pass
+
+    def get_parent(self):
+        return self.get_context()
+
+    def get_storage(self):
+        return self
+
+    def get_path_prefix(self):
+        return ''
+
+    def get_path_delimiter(self):
+        return DEFAULT_PATH_DELIMITER
+
+    def get_path(self):
+        return self.get_path_prefix()
+
+    def get_path_as_list(self):
+        return [self.get_path()]
+
+
+class AbstractFolder(HierarchicConnector):
+    def __init__(
+            self,
+            name,
+            parent,
+            verbose=AUTO,
+    ):
+        super().__init__(
+            name=name,
+            parent=parent,
+        )
+        self.verbose = verbose if verbose is not None and verbose != AUTO else parent.verbose
+
+    def is_root(self):
+        False
+
+    @abstractmethod
+    def get_default_child_class(self):
+        pass
+
+
+class FlatFolder(AbstractFolder):
+    def __init__(
+            self,
+            name,
+            parent,
+            verbose=AUTO,
+    ):
+        super().__init__(
+            name=name,
+            parent=parent,
+            verbose=verbose,
+        )
+
+    @abstractmethod
+    def get_default_child_class(self):
+        pass
+
+    def get_path_prefix(self):
+        return self.get_storage().get_path_prefix()
+
+    def get_path_delimiter(self):
+        return self.get_storage().get_path_delimiter()
+
+    def get_path_as_list(self):
+        return self.get_parent().get_path_as_list() + self.get_name().split(self.get_path_delimiter())
+
+
+class HierarchicFolder(HierarchicConnector):
+    def __init__(
+            self,
+            name,
+            parent,
+            verbose=AUTO,
+    ):
+        super().__init__(
+            name=name,
+            parent=parent,
+        )
+        self.verbose = verbose if verbose is not None and verbose != AUTO else parent.verbose
+
+    def get_default_child_class(self):
+        return self.__class__
+
+    def get_folders(self):
+        folders = list()
+        for folder in self.children:
+            folders.append(folder)
+        return folders
