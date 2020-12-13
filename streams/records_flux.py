@@ -217,6 +217,14 @@ class RecordsFlux(fx.AnyFlux):
             dataframe = dataframe[columns]
         return dataframe
 
+    def show(self, count=10, filters=[]):
+        if self.can_be_in_memory():
+            self.data = self.get_list()
+            self.count = self.get_count()
+        print(self.expected_count(), self.get_columns())
+        fx_sample = self.filter(*filters) if filters else self
+        return fx_sample.take(count).get_dataframe()
+
     def to_lines(self, columns, add_title_row=False, delimiter='\t'):
         return fx.LinesFlux(
             self.to_rows(columns, add_title_row=add_title_row),
