@@ -48,6 +48,10 @@ class FluxContext:
         self.cs = cs
         self.sh = sh
 
+    @staticmethod
+    def is_context():
+        return True
+
     def get_context(self):
         return self
 
