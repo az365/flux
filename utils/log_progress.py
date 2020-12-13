@@ -1,5 +1,5 @@
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 import logging
 
@@ -15,11 +15,11 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     )
 
 
-DEFAULT_STEP = 1000
+DEFAULT_STEP = 10000
 DEFAULT_LOGGER_NAME = 'flux'
 DEFAULT_LOGGING_LEVEL = logging.WARNING
 DEFAULT_FORMATTER = '%(asctime)s - %(levelname)s - %(message)s'
-DEFAULT_LINE_LEN = 120
+DEFAULT_LINE_LEN = 127
 LONG_LINE_LEN = 600
 
 
@@ -111,6 +111,9 @@ class Logger:
             step=step,
         )
 
+    def new_progress(self, name, **kwargs):
+        return Progress(name, logger=self, **kwargs)
+
     def log(self, msg, level=arg.DEFAULT, logger=arg.DEFAULT, end=arg.DEFAULT, verbose=True):
         level = arg.undefault(level, LoggingLevel.Info if verbose else LoggingLevel.Debug)
         logger = arg.undefault(logger, self.base_logger)
@@ -166,6 +169,7 @@ class Progress:
             self,
             name='Progress',
             count=None,
+            timing=True,
             verbose=True,
             logger=arg.DEFAULT,
             context=None,
@@ -175,7 +179,9 @@ class Progress:
         self.verbose = verbose
         self.state = OperationStatus.New
         self.position = 0
+        self.timing = timing
         self.start_time = None
+        self.past_time = timedelta(0)
         self.context = context
         if logger is None:
             self.logger = None
@@ -196,15 +202,67 @@ class Progress:
                 verbose=arg.undefault(verbose, self.verbose),
             )
 
+    def is_started(self):
+        return self.start_time is not None
+
+    def is_finished(self):
+        if self.expected_count:
+            return self.position >= self.expected_count
+
+    def evaluate_share(self):
+        if self.expected_count:
+            return (self.position + 1) / self.expected_count
+
+    def evaluate_speed(self):
+        cur_time = datetime.now()
+        self.past_time = cur_time - self.start_time
+        if self.past_time.total_seconds():
+            speed = self.position / self.past_time.total_seconds()
+            return int(speed)
+
+    def get_timing_str(self):
+        if self.is_finished():
+            finish_time = datetime.now()
+            self.past_time = finish_time - self.start_time
+            past_minutes = int(self.past_time.total_seconds() / 60)
+            return "{:02}:{:02}+{:02}:{:02}'{:02}={:02}{:02}".format(
+                self.start_time.hour, self.start_time.minute,
+                int(past_minutes / 60), past_minutes % 60, int(self.past_time.total_seconds()) % 60,
+                finish_time.hour, finish_time.minute,
+            )
+        elif self.expected_count:
+            finish_time = self.start_time + self.past_time / (self.evaluate_share() or 0.001)
+            rest_time = finish_time - datetime.now()
+            has_long_rest_time = rest_time.total_seconds() >= 100 * 69
+            if has_long_rest_time:
+                return "{:02}:{:02}+{:02}+{:03}~{:02}:(:02}".format(
+                    self.start_time.hour, self.start_time.minute,
+                    int(round(self.past_time.total_seconds() / 60, 0)), int(rest_time.total_seconds() / 60),
+                    finish_time.hour, finish_time.minute,
+                )
+            else:
+                return "{:02}:{:02}+{:02}+{:02}'{:02}~{:02}:{:02}".format(
+                    self.start_time.hour, self.start_time.minute,
+                    int(round(self.past_time.total_seconds() / 60, 0)),
+                    int(rest_time.total_seconds() / 60), int(rest_time.total_seconds()) % 60,
+                    finish_time.hour, finish_time.minute,
+                )
+        else:
+            return "{:02}:{:02}+{:02}".format(
+                self.start_time.hour, self.start_time.minute, int(round(self.past_time.total_seconds() % 60, 0)),
+            )
+
     def update_now(self, cur):
         self.position = cur or self.position or 0
         if self.state != OperationStatus.InProgress:
             self.start(cur)
         if self.expected_count:
-            percent = fs.percent(str)((self.position + 1) / self.expected_count)
+            percent = fs.percent(str)(self.evaluate_share())
             line = '{}: {} ({}/{}) items processed'.format(self.name, percent, self.position + 1, self.expected_count)
         else:
             line = '{}: {} items processed'.format(self.name, self.position + 1)
+        if self.timing:
+            line = '{} {} ({} it/sec)'.format(self.get_timing_str(), line, self.evaluate_speed())
         self.log(line, level=LoggingLevel.Debug, end='\r')
 
     def update_with_step(self, position, step=arg.DEFAULT):
@@ -217,7 +275,9 @@ class Progress:
         if step_passed or pool_finished:
             self.update_now(position)
 
-    def update(self, position, step=None):
+    def update(self, position, step=None, message=None):
+        if message and message != arg.DEFAULT:
+            self.name = message
         if step is None or step == 1:
             self.update_now(position)
         else:
@@ -233,8 +293,11 @@ class Progress:
             self.log('{} ({} items): starting...'.format(self.name, self.expected_count))
 
     def finish(self, position=None):
+        self.expected_count = position
         self.update(position)
         message = '{}: Done. {} items processed'.format(self.name, self.position + 1)
+        if self.timing:
+            message = '{} {} ({} it/sec)'.format(self.get_timing_str(), message, self.evaluate_speed())
         self.log(message)
 
     def iterate(self, items, name=None, expected_count=None, step=arg.DEFAULT):
