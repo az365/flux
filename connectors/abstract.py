@@ -44,11 +44,14 @@ class AbstractConnector(ABC):
         return self.parent
 
     def get_storage(self):
-        if not self.is_root():
-            return self.get_parent().get_storage()
+        parent = self.get_parent()
+        if parent and not self.is_root():
+            return parent.get_storage()
 
     def get_context(self):
-        return self.get_parent().get_context()
+        parent = self.get_parent()
+        if parent:
+            return self.get_parent().get_context()
 
     def get_logger(self):
         if self.get_context():
@@ -75,7 +78,11 @@ class AbstractConnector(ABC):
         return self.get_storage().get_path_prefix()
 
     def get_path_delimiter(self):
-        return self.get_storage().get_path_delimiter()
+        storage = self.get_storage()
+        if storage:
+            return storage.get_path_delimiter()
+        else:
+            return DEFAULT_PATH_DELIMITER
 
     def get_path(self):
         if self.is_root():
