@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from enum import Enum
 import gc
 import requests
@@ -8,6 +8,7 @@ import psycopg2.extras
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
     import conns as cs
+    from connectors import abstract as ac
     from utils import (
         arguments as arg,
         schema as sh,
@@ -18,6 +19,7 @@ try:  # Assume we're a sub-module in a package.
 except ImportError:  # Apparently no higher-level package has been imported, fall back to a local import.
     from .. import fluxes as fx
     from .. import conns as cs
+    from ..connectors import abstract as ac
     from ..utils import (
         arguments as arg,
         schema as sh,
@@ -28,7 +30,6 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
 
 
 AUTO = arg.DEFAULT
-COMMON_PROPS = ['verbose', ]
 TEST_QUERY = 'SELECT now()'
 DEFAULT_GROUP = 'PUBLIC'
 DEFAULT_STEP = 1000
@@ -40,8 +41,13 @@ class DatabaseType(Enum):
     ClickhouseDatabase = 'ch'
 
 
-class AbstractDatabase(ABC):
-    def __init__(self, host, port, db, user, password, verbose=arg.DEFAULT, context=None, **kwargs):
+class AbstractDatabase(ac.AbstractStorage):
+    def __init__(self, name, host, port, db, user, password, verbose=AUTO, context=None, **kwargs):
+        super().__init__(
+            name=name,
+            context=context,
+            verbose=verbose,
+        )
         self.host = host
         self.port = port
         self.db = db
@@ -49,47 +55,26 @@ class AbstractDatabase(ABC):
         self.password = password
         self.conn_kwargs = kwargs
         self.connection = None
-        self.tables = dict()
-        self.verbose = verbose
-        self.context = context
-        if context is not None:
-            for prop in COMMON_PROPS:
-                if hasattr(context, prop):
-                    setattr(self, prop, getattr(context, prop))
 
-    def get_context(self):
-        return self.context
+    def get_default_child_class(self):
+        return Table
 
-    def get_logger(self):
-        if self.context is not None:
-            return self.context.get_logger()
-        else:
-            return log_progress.get_logger()
-
-    def log(self, msg, level=arg.DEFAULT, end=arg.DEFAULT, verbose=True):
-        logger = self.get_logger()
-        if logger is not None:
-            logger.log(
-                msg=msg, level=level,
-                end=end, verbose=verbose,
-            )
+    def get_tables(self):
+        return self.get_items()
 
     def table(self, name, schema=None, **kwargs):
-        table = self.tables.get(name)
+        table = self.get_tables().get(name)
         if table:
             assert not kwargs, 'table connection {} is already registered'.format(name)
         else:
             assert schema is not None, 'for create table schema must be defined'
             table = Table(name, schema=schema, database=self, **kwargs)
-            self.tables[name] = table
+            self.get_tables()[name] = table
         return table
 
     def close(self):
         if hasattr(self, 'disconnect'):
             return self.disconnect()
-
-    def get_items(self):
-        return self.tables
 
     def get_links(self):
         for item in self.get_items():
@@ -337,8 +322,9 @@ class AbstractDatabase(ABC):
 
 
 class PostgresDatabase(AbstractDatabase):
-    def __init__(self, host, port, db, user, password, context=None, **kwargs):
+    def __init__(self, name, host, port, db, user, password, context=None, **kwargs):
         super().__init__(
+            name=name,
             host=host,
             port=port,
             db=db,
@@ -506,6 +492,7 @@ class PostgresDatabase(AbstractDatabase):
 class ClickhouseDatabase(AbstractDatabase):
     def __init__(
             self,
+            name,
             host='localhost',
             port=8443,
             db='public',
@@ -515,6 +502,7 @@ class ClickhouseDatabase(AbstractDatabase):
             **kwargs
     ):
         super().__init__(
+            name=name,
             host=host,
             port=port,
             db=db,
@@ -599,7 +587,7 @@ class ClickhouseDatabase(AbstractDatabase):
         return DatabaseType.ClickhouseDatabase.value
 
 
-class Table:
+class Table(ac.LeafConnector):
     def __init__(
             self,
             name,
@@ -608,35 +596,25 @@ class Table:
             reconnect=True,
             **kwargs
     ):
-        self.name = name
+        super().__init__(
+            name=name,
+            parent=database,
+        )
         self.schema = schema
         if not isinstance(schema, sh.SchemaDescription):
             message = 'Schema as {} is deprecated. Use schema.SchemaDescription instead.'.format(type(schema))
             self.log(msg=message, level=log_progress.LoggingLevel.Warning)
         self.meta = kwargs
-        self.database = database
         if reconnect:
-            if hasattr(self.database, 'connect'):
-                self.database.connect(reconnect=True)
+            if hasattr(self.get_database(), 'connect'):
+                self.get_database().connect(reconnect=True)
         self.links = list()
 
-    def get_context(self):
-        return self.database.get_context()
-
-    def get_logger(self):
-        return self.database.get_logger()
-
-    def log(self, msg, level=arg.DEFAULT, end=arg.DEFAULT, verbose=True):
-        self.database.log(
-            msg=msg, level=level,
-            end=end, verbose=verbose,
-        )
+    def get_database(self):
+        return self.parent
 
     def get_count(self, verbose=arg.DEFAULT):
         return self.database.select_count(self.name, verbose=verbose)
-
-    def get_name(self):
-        return self.name
 
     def get_data(self, verbose=arg.DEFAULT):
         return self.database.select_all(self.name, verbose=verbose)
