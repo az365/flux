@@ -452,7 +452,7 @@ class CsvFile(TextFile):
         return self.schema
 
     def get_schema_str(self, dialect='pg'):
-        return self.schema.get_schema_str(dialect=dialect)
+        return self.get_schema().get_schema_str(dialect=dialect)
 
     def set_schema(self, schema, return_file=True):
         if schema is None:
@@ -581,6 +581,11 @@ class CsvFile(TextFile):
 
     def to_memory(self):
         return self.to_records_flux().to_memory()
+
+    def show(self, count=10, filters=[], recount=False):
+        if recount:
+            self.count_lines(True)
+        return self.to_records_flux().show(count, filters)
 
     def write_rows(self, rows, verbose=AUTO):
         def get_rows_with_title():
