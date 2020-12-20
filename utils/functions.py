@@ -1,3 +1,6 @@
+import math
+import numpy as np
+
 try:  # Assume we're a sub-module in a package.
     import fluxes as fx
     from utils import (
@@ -62,6 +65,18 @@ def percent(field_type=float, round_digits=1, default_value=None):
 def defined():
     def func(value):
         return value is not None
+    return func
+
+
+def is_none():
+    def func(value):
+        return value is None or value is np.nan or math.isnan(value)
+    return func
+
+
+def not_none():
+    def func(value):
+        return not is_none()(value)
     return func
 
 
@@ -301,4 +316,16 @@ def compare_lists(a_field='a_only', b_field='b_only', ab_field='common', as_dict
 def list_minus():
     def func(list_a, list_b):
         return [i for i in list_a if i not in list_b]
+    return func
+
+
+def values_not_none():
+    def func(a):
+        return [v for v in a if not_none()(v)]
+    return func
+
+
+def mean():
+    def func(a):
+        return np.mean(values_not_none()(a))
     return func
