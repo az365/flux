@@ -48,15 +48,6 @@ def to_date(d, as_iso_date=False):
         return cur_date
 
 
-def get_month_first_date(d):
-    if check_iso_date(d):
-        return d[:8] + '01'
-    elif isinstance(d, date):
-        return date(d.year, d.month, 1)
-    else:
-        raise_date_type_error(d)
-
-
 def get_month_from_date(d):
     if check_iso_date(d):
         return date.fromisoformat(d).month
@@ -64,6 +55,15 @@ def get_month_from_date(d):
         return d.month
     else:
         raise_date_type_error(c)
+
+
+def get_month_first_date(d):
+    if check_iso_date(d):
+        return d[:8] + '01'
+    elif isinstance(d, date):
+        return date(d.year, d.month, 1)
+    else:
+        raise_date_type_error(d)
 
 
 def get_monday_date(d, as_iso_date=None):
@@ -98,7 +98,7 @@ def get_next_year_date(d, increment=1, round_to_monday=False):
 def get_next_week_date(d, increment=1, round_to_monday=False):
     is_iso_format = check_iso_date(d)
     if is_iso_format:
-        dt = date.friomisoformat(d)
+        dt = date.fromisoformat(d)
     elif isinstance(d, date):
         dt = d
     else:
