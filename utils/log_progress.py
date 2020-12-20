@@ -225,7 +225,7 @@ class Progress:
             finish_time = datetime.now()
             self.past_time = finish_time - self.start_time
             past_minutes = int(self.past_time.total_seconds() / 60)
-            return "{:02}:{:02}+{:02}:{:02}'{:02}={:02}{:02}".format(
+            return "{:02}:{:02}+{:02}:{:02}'{:02}={:02}:{:02}".format(
                 self.start_time.hour, self.start_time.minute,
                 int(past_minutes / 60), past_minutes % 60, int(self.past_time.total_seconds()) % 60,
                 finish_time.hour, finish_time.minute,
@@ -233,9 +233,9 @@ class Progress:
         elif self.expected_count:
             finish_time = self.start_time + self.past_time / (self.evaluate_share() or 0.001)
             rest_time = finish_time - datetime.now()
-            has_long_rest_time = rest_time.total_seconds() >= 100 * 69
+            has_long_rest_time = rest_time.total_seconds() >= 100 * 60
             if has_long_rest_time:
-                return "{:02}:{:02}+{:02}+{:03}~{:02}:(:02}".format(
+                return "{:02}:{:02}+{:02}+{:03}~{:02}:{:02}".format(
                     self.start_time.hour, self.start_time.minute,
                     int(round(self.past_time.total_seconds() / 60, 0)), int(rest_time.total_seconds() / 60),
                     finish_time.hour, finish_time.minute,
