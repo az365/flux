@@ -17,6 +17,7 @@ class PandasFlux(fx.RecordsFlux):
             self,
             data,
             count=None,
+            less_than=None,
             check=False,
             source=None,
             context=None,
@@ -33,6 +34,7 @@ class PandasFlux(fx.RecordsFlux):
         super().__init__(
             dataframe,
             count=count or dataframe.shape[1],
+            less_than=less_than or dataframe.shape[1],
             check=check,
             source=source,
             context=context,
@@ -56,6 +58,9 @@ class PandasFlux(fx.RecordsFlux):
 
     def get_records(self, **kwargs):
         yield from self.iterable(as_records=True)
+
+    def get_one_column(self, column):
+        return self.data[column]
 
     def get_dataframe(self, columns=None):
         if columns:
@@ -91,9 +96,26 @@ class PandasFlux(fx.RecordsFlux):
             return self.add_items(dataframe_or_flux_or_items)
 
     def select(self, *fields, **expressions):
-        assert not expressions, 'custom expressions are not implemented now'
+        assert not expressions, 'custom expressions are not implemented yet'
         dataframe = self.get_dataframe(columns=fields)
         return PandasFlux(dataframe)
+
+    def filter(self, *filters, **expressions):
+        assert not filters, 'custom filters are not implemented yet'
+        pandas_filter = None
+        for k, v in expressions.items():
+            one_filter = self.get_one_column(k) == v
+            if pandas_filter:
+                pandas_filter = pandas_filter & one_filter
+            else:
+                pandas_filter = one_filter
+        if pandas_filter:
+            return PandasFlux(
+                self.data[pandas_filter],
+                **self.get_meta()
+            )
+        else:
+            return self
 
     def sort(self, *keys, reverse=False, step=arg.DEFAULT, verbose=True):
         dataframe = self.get_dataframe().sort_values(
@@ -126,6 +148,6 @@ class PandasFlux(fx.RecordsFlux):
             columns,
         ).to_records()
 
-    def show(self, count=10):
+    def show(self, count=10, filters={}):
         self.log(['Show:', self.class_name(), self.get_meta(), '\n'])
-        return self.get_dataframe().head(count)
+        return self.filter(**filters).get_dataframe().head(count)
