@@ -179,6 +179,9 @@ class AbstractStorage(HierarchicConnector):
     def get_default_child_class(self):
         pass
 
+    def get_context(self):
+        return self.parent
+
     def get_parent(self):
         return self.get_context()
 
@@ -212,7 +215,7 @@ class AbstractFolder(HierarchicConnector):
         self.verbose = verbose if verbose is not None and verbose != AUTO else parent.verbose
 
     def is_root(self):
-        False
+        return False
 
     @abstractmethod
     def get_default_child_class(self):
