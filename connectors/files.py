@@ -61,8 +61,8 @@ class LocalStorage(ac.AbstractStorage):
     def get_folders(self):
         return self.children
 
-    def folder(self, name, path=AUTO, **kwargs):
-        return self.child(name, path, **kwargs)
+    def folder(self, name, **kwargs):
+        return self.child(name, **kwargs)
 
     def get_path_delimiter(self):
         return self.path_delimiter
@@ -72,15 +72,19 @@ class LocalFolder(ac.FlatFolder):
     def __init__(
             self,
             path,
-            storage=LocalStorage(),
+            path_is_relative=True,
+            storage=AUTO,
+            context=None,
             verbose=AUTO,
     ):
+        storage = arg.undefault(storage, LocalStorage(context=context))
         assert isinstance(storage, LocalStorage)
         super().__init__(
             name=path,
             parent=storage,
             verbose=verbose,
         )
+        self.path_is_relative = path_is_relative
 
     def get_default_child_class(self):
         return TextFile
@@ -107,7 +111,7 @@ class LocalFolder(ac.FlatFolder):
         return self.get_items()
 
     def file(self, name, filetype=AUTO, **kwargs):
-        file = self.files.get(name)
+        file = self.get_files().get(name)
         if kwargs or not file:
             filename = kwargs.pop('filename', name)
             file_class = self.get_child_class_by_name_and_type(name, filetype)
@@ -117,7 +121,7 @@ class LocalFolder(ac.FlatFolder):
 
     def add_file(self, name, file):
         assert cs.is_file(file), 'file must be an instance of *File (got {})'.format(type(file))
-        assert name not in self.files, 'file with name {} is already registered'.format(name)
+        assert name not in self.get_files(), 'file with name {} is already registered'.format(name)
         self.get_files()[name] = file
 
     def get_links(self):
@@ -131,7 +135,7 @@ class LocalFolder(ac.FlatFolder):
             if file:
                 closed_count += file.close() or 0
         else:
-            for file in self.files.values():
+            for file in self.get_files().values():
                 closed_count += file.close() or 0
         return closed_count
 
@@ -139,6 +143,12 @@ class LocalFolder(ac.FlatFolder):
         meta = self.__dict__.copy()
         meta.pop('files')
         return meta
+
+    def get_path(self):
+        if self.path_is_relative:
+            return self.get_name()
+        else:
+            return super().get_path()
 
 
 class AbstractFile(ac.LeafConnector):
@@ -196,7 +206,7 @@ class AbstractFile(ac.LeafConnector):
             elif folder_path:
                 return '{}{}{}'.format(folder_path, self.get_path_delimiter(), self.get_name())
             else:
-                return self.filename
+                return self.get_name()
 
     def get_list_path(self):
         return self.get_path().split(self.get_path_delimiter())
@@ -205,7 +215,7 @@ class AbstractFile(ac.LeafConnector):
         return self.get_path_delimiter().join(self.get_list_path()[:-1])
 
     def is_inside_folder(self, folder=AUTO):
-        folder_obj = arg.undefault(folder, self.folder)
+        folder_obj = arg.undefault(folder, self.get_folder())
         folder_path = folder_obj.get_path() if isinstance(folder_obj, LocalFolder) else folder_obj
         return self.get_folder_path() in folder_path
 
@@ -484,7 +494,7 @@ class CsvFile(TextFile):
         title_row = next(rows)
         self.close()
         schema = sh.detect_schema_by_title_row(title_row)
-        message = 'Schema for {} detected by title row: {}'.format(self.filename, schema.get_schema_str(None))
+        message = 'Schema for {} detected by title row: {}'.format(self.get_name(), schema.get_schema_str(None))
         self.log(message, end='\n', verbose=verbose)
         if set_schema:
             self.schema = schema
