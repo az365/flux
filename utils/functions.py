@@ -223,6 +223,14 @@ def elem_no(position, default=None):
     return func
 
 
+def first():
+    return elem_no(0)
+
+
+def last():
+    return elem_no(-1)
+
+
 def value_by_key(key, default=None):
     def func(item):
         if isinstance(item, dict):
@@ -323,6 +331,36 @@ def values_not_none():
     def func(a):
         return [v for v in a if not_none()(v)]
     return func
+
+
+def pair_filter(function=not_none()):
+    def func(a, b):
+        a_filtered, b_filtered = list(), list()
+        for cur_a, cur_b in zip(a, b):
+            take_a = function(cur_a)
+            take_b = function(cur_b)
+            if take_a and take_b:
+                a_filtered.append(cur_a)
+                b_filtered.append(cur_b)
+        return a_filtered, b_filtered
+    return func
+
+
+def pair_stat(stat_func, filter_func=None):
+    def func(a, b):
+        if filter_func:
+            data = pair_filter(filter_func)(a, b)
+        else:
+            data = (a, b)
+        return stat_func(*data)
+    return func
+
+
+def corr():
+    return pair_stat(
+        filter_func=nonzero(),
+        stat_func=lambda *v: np.corrcoef(*v)[0, 1],
+    )
 
 
 def mean():
