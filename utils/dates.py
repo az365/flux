@@ -10,6 +10,7 @@ DAYS_IN_WEEK = 7
 DAYS_IN_MONTH = 30.5
 WEEKS_IN_YEAR = 52
 MONTHS_IN_YEAR = 12
+
 MIN_YEAR = 2010
 
 
@@ -47,6 +48,17 @@ def to_date(d, as_iso_date=False):
         return cur_date.isoformat()
     else:
         return cur_date
+
+
+def get_shifted_date(d, *args, **kwargs):
+    as_iso_date = check_iso_date(d)
+    shift = timedelta(*args, **kwargs)
+    cur_date = get_date(d)
+    shifted_date = cur_date + shift
+    if as_iso_date:
+        return to_date(shifted_date, as_iso_date=as_iso_date)
+    else:
+        return shifted_date
 
 
 def get_month_from_date(d):
@@ -151,29 +163,41 @@ def get_months_range(date_min, date_max):
     return months_range
 
 
-def get_months_between(a, b, round_to_months=False, get_abs=False):
+def get_months_between(a, b, round_to_months=False, take_abs=False):
     if round_to_months:
         a = get_month_first_date(a)
         b = get_month_first_date(b)
-    days_between = get_days_between(a, b, get_abs=get_abs)
+    days_between = get_days_between(a, b, take_abs=take_abs)
     months = int(days_between / int(DAYS_IN_MONTH))
     return months
 
 
-def get_weeks_between(a, b, round_to_mondays=False, get_abs=False):
+def get_weeks_between(a, b, round_to_mondays=False, take_abs=False):
     if round_to_mondays:
         a = get_monday_date(a, as_iso_date=False)
         b = get_monday_date(b, as_iso_date=False)
-    days_between = get_days_between(a, b, get_abs=get_abs)
+    days_between = get_days_between(a, b, take_abs=take_abs)
     weeks = int(days_between / DAYS_IN_WEEK)
     return weeks
 
 
-def get_days_between(a, b, get_abs=False):
+def get_days_between(a, b, take_abs=False):
     date_a = get_date(a)
     date_b = get_date(b)
     days = (date_b - date_a).days
-    return abs(days) if get_abs else days
+    return abs(days) if take_abs else days
+
+
+def get_yearly_dates(date_init, date_min, date_max):
+    yearly_dates = list()
+    cur_date = date_init
+    while cur_date > date_min:
+        cur_date = get_next_year_date(cur_date, increment=-1)
+    while cur_date <= date_max:
+        if date_min <= cur_date <= date_max:
+            yearly_dates.append(cur_date)
+        cur_date = get_next_year_date(cur_date, increment=1)
+    return yearly_dates
 
 
 def get_date_from_year_and_week(year, week, as_iso_date=True):
@@ -193,6 +217,11 @@ def get_year_and_week_from_date(d):
         year += 1
         week = 0
     return year, week
+
+
+def get_day_abs_from_date(d, min_date=arg.DEFAULT):
+    min_date = arg.undefault(min_date, get_year_start_monday(get_min_year()))
+    return get_days_between(min_date, d)
 
 
 def get_week_abs_from_year_and_week(year, week, min_year=arg.DEFAULT):
