@@ -101,6 +101,12 @@ class S3Storage(ac.AbstractObjectStorage):
             )
         return bucket
 
+    def get_resource_properties(self):
+        return dict(
+            service_name=self.get_service_name(),
+            endpoint_url=self.endpoint_url,
+        )
+
 
 class S3Bucket(ac.FlatFolder):
     def __init__(
@@ -127,7 +133,10 @@ class S3Bucket(ac.FlatFolder):
         return S3Folder
 
     def folder(self, name, **kwargs):
-        self.child(name, kwargs)
+        return self.child(name, bucket=self, **kwargs)
+
+    def get_bucket_name(self):
+        return self.name
 
     def get_session(self, props=None):
         if not self.session:
@@ -149,10 +158,7 @@ class S3Bucket(ac.FlatFolder):
 
     def reset_client(self, props=None):
         if not props:
-            props = dict(
-                service_name=self.service_name,
-                endpoint_url=self.endpoint_url,
-            )
+            props = self.get_storage().get_resource_properties()
         self.client = self.get_session().client(**props)
 
     def get_resource(self, props=None):
@@ -162,10 +168,7 @@ class S3Bucket(ac.FlatFolder):
 
     def reset_resource(self, props=None):
         if not props:
-            props = dict(
-                service_name=self.service_name,
-                endpoint_url=self.endpoint_url,
-            )
+            props = self.get_storage().get_resource_properties()
         self.resource = self.get_session().resource(**props)
 
     def list_objects(self, params=None, v2=False, field='Contents'):
@@ -175,11 +178,11 @@ class S3Bucket(ac.FlatFolder):
             params['Bucket'] = self.get_name()
         if 'Delimiter' not in params:
             params['Delimiter'] = self.get_path_delimiter()
-        session = self.get_session()
+        client = self.get_client(self.get_storage().get_resource_properties())
         if v2:
-            objects = session.list_objects_v2(**params)
+            objects = client.list_objects_v2(**params)
         else:
-            objects = session.list_objects(**params)
+            objects = client.list_objects(**params)
         if field:
             return objects[field]
         else:
@@ -257,10 +260,23 @@ class S3Object(ac.LeafConnector):
         return self.get_folder().get_bucket()
 
     def get_object_path_in_bucket(self):
-        return self.get_folder().get_name() + self.get_path_delimiter() + self.get_name()
+        if self.get_folder().get_name():
+            return self.get_folder().get_name() + self.get_path_delimiter() + self.get_name()
+        else:
+            return self.get_name()
 
     def get_buffer(self):
         return self.get_folder().get_buffer(self.get_object_path_in_bucket())
 
+    def get_object_response(self):
+        return self.get_bucket().get_client().get_object(
+            Bucket=self.get_bucket().get_name(),
+            Key=self.get_object_path_in_bucket(),
+        )
+
+    def get_body(self):
+        return self.get_object_response()['Body']
+
     def get_data(self):
-        return self.get_buffer()
+        for line in self.get_body():
+            yield line.decode('utf8', errors='ignore')
