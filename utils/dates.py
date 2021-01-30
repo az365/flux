@@ -6,10 +6,12 @@ except ImportError:  # Apparently no higher-level package has been imported, fal
     from ..utils import arguments as arg
 
 
-DAYS_IN_WEEK = 7
-DAYS_IN_MONTH = 30.5
-WEEKS_IN_YEAR = 52
+DAYS_IN_YEAR = 365
 MONTHS_IN_YEAR = 12
+MEAN_DAYS_IN_MONTH = DAYS_IN_YEAR / MONTHS_IN_YEAR
+MAX_DAYS_IN_MONTH = 31
+DAYS_IN_WEEK = 7
+WEEKS_IN_YEAR = 52
 
 MIN_YEAR = 2010
 
@@ -168,7 +170,7 @@ def get_months_between(a, b, round_to_months=False, take_abs=False):
         a = get_month_first_date(a)
         b = get_month_first_date(b)
     days_between = get_days_between(a, b, take_abs=take_abs)
-    months = int(days_between / int(DAYS_IN_MONTH))
+    months = int(days_between / int(MEAN_DAYS_IN_MONTH))
     return months
 
 
@@ -230,9 +232,11 @@ def get_week_abs_from_year_and_week(year, week, min_year=arg.DEFAULT):
     return week_abs
 
 
-def get_week_abs_from_date(d, min_year=arg.DEFAULT):
+def get_week_abs_from_date(d, min_year=arg.DEFAULT, decimal=False):
     year, week = get_year_and_week_from_date(d)
     week_abs = get_week_abs_from_year_and_week(year, week, min_year=min_year)
+    if decimal:
+        week_abs += get_days_between(get_monday_date(d), d) / DAYS_IN_WEEK
     return week_abs
 
 
@@ -253,3 +257,38 @@ def get_date_from_week_abs(week_abs, min_year=arg.DEFAULT, as_iso_date=True):
     year, week = get_year_and_week_from_week_abs(week_abs, min_year=min_year)
     cur_date = get_date_from_year_and_week(year, week, as_iso_date=as_iso_date)
     return cur_date
+
+
+def get_date_from_day_abs(day_abs, min_date=arg.DEFAULT, as_iso_date=True):
+    min_date = arg.undefault(min_date, get_year_start_monday(get_min_year(), as_iso_date=as_iso_date))
+    cur_date = get_shifted_date(min_date, days=day_abs)
+    return cur_date
+
+
+def get_date_from_year(year, as_iso_date=True):
+    int_year = int(year)
+    year_part = year - int_year
+    cur_date = get_year_start_monday(year=int_year, as_iso_date=as_iso_date)
+    if year_part:
+        cur_date = get_shifted_date(cur_date, days=year_part * DAYS_IN_YEAR)
+    return cur_date
+
+
+def get_year_from_date(d, decimal=False):
+    year = get_date(d).year
+    if decimal:
+        year += get_days_between(get_year_start_monday(year), d) / DAYS_IN_YEAR
+    return year
+
+
+def get_date_from_numeric(numeric, from_scale='days'):
+    available_scales = ('day', 'week', 'year')
+    if from_scale.startswith('da'):  # daily, day, days
+        func = get_date_from_day_abs
+    elif from_scale.startswith('week'):
+        func = get_date_from_week_abs
+    elif from_scale.startswith('year'):
+        func = get_date_from_year
+    else:
+        raise ValueError('only {} time scales supported (got {})'.format(','.join(available_scales), from_scale))
+    return func(numeric)
